@@ -6,6 +6,9 @@ on:
 jobs: 
     deploy:
         runs-on: ubuntu-latest
+        defaults: 
+          runs: 
+              working-directory: frontend
         steps:
             - name: Check out the code
               uses: actions/checkout@v4
