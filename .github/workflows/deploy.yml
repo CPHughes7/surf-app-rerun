@@ -7,7 +7,7 @@ jobs:
     deploy:
         runs-on: ubuntu-latest
         defaults: 
-          runs: 
+          run: 
               working-directory: frontend
         steps:
             - name: Check out the code
