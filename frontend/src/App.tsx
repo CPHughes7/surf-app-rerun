@@ -26,7 +26,7 @@ const LAST_UPDATED_LABEL = 'Jun 29, 2026 · 1:30 PM CDT'
 const SPOTS: SurfSpot[] = [
   {
     id: 'montrose',
-    name: 'Montrose Beach',
+    name: 'Montrose',
     region: 'Chicago, IL',
     latHint: '41.97° N',
     lngHint: '87.64° W',
@@ -60,7 +60,7 @@ const SPOTS: SurfSpot[] = [
   },
   {
     id: 'new-buffalo',
-    name: 'New Buffalo',
+    name: 'New.... ',
     region: 'MI (Lake Michigan)',
     latHint: '41.79° N',
     lngHint: '86.74° W',
