@@ -10,18 +10,9 @@
   --accent-bg: rgba(14, 116, 144, 0.1);
   --accent-border: rgba(14, 116, 144, 0.45);
 
-  --lake-light: #7ec8e3;
-  --lake-deep: #2b7a9b;
-  --lake-border: #1d5f7a;
-  --map-land: #e8edf2;
-  --map-bg: #eef2f6;
+  --shadow: rgba(0, 0, 0, 0.12) 0 8px 24px;
 
-  --decision-go: #15803d;
-  --decision-go-bg: rgba(21, 128, 61, 0.12);
-  --decision-maybe: #b45309;
-  --decision-maybe-bg: rgba(180, 83, 9, 0.12);
-  --decision-no-go: #b91c1c;
-  --decision-no-go-bg: rgba(185, 28, 28, 0.12);
+  --map-bg: #eef2f6;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -49,18 +40,9 @@
     --accent-bg: rgba(34, 211, 238, 0.12);
     --accent-border: rgba(34, 211, 238, 0.4);
 
-    --lake-light: #1e4d63;
-    --lake-deep: #0f3040;
-    --lake-border: #2a6a85;
-    --map-land: #1a222c;
-    --map-bg: #121820;
+    --shadow: rgba(0, 0, 0, 0.4) 0 8px 24px;
 
-    --decision-go: #4ade80;
-    --decision-go-bg: rgba(74, 222, 128, 0.15);
-    --decision-maybe: #fbbf24;
-    --decision-maybe-bg: rgba(251, 191, 36, 0.15);
-    --decision-no-go: #f87171;
-    --decision-no-go-bg: rgba(248, 113, 113, 0.15);
+    --map-bg: #121820;
   }
 }
 

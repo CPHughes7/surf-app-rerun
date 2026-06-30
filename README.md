@@ -1,33 +1,33 @@
 # surf-app-rerun
 
-Lake surf decision prototype — a single-page, front-end-only experience for choosing where to go based on simplified conditions.
+Lake surf map prototype — front-end only, ephemeral session pins on a real map.
 
 ## What this is
 
-A static MVP that visualizes one workflow:
+A single-page workflow for dropping and reviewing surf spots on Lake Michigan:
 
-1. Land on a home view with a left drawer, center map, and bottom decision bar.
-2. Select a surf spot on the mock map (or from the spot list).
-3. Review placeholder conditions in the drawer.
-4. Read a Go / Maybe / No-Go signal and rationale in the bottom bar.
+1. Open the app — Leaflet map centered on Lake Michigan with OpenStreetMap tiles.
+2. Click the map — name a spot and drop a pin (session only).
+3. Click any pin — popup shows NOAA placeholder first, Windy iframe second.
+4. Click **Open** — generic detail panel slides in on the same page (no new routes).
 
-All data is hardcoded placeholder content. There is no backend, no persistence, and no cross-server or cross-site communication.
+All pin data lives in React state and clears on refresh. No backend, no database, no local storage.
 
 ## In scope
 
-- One-page layout (drawer + map + bottom bar)
-- Interactive spot selection (local React state only)
-- Placeholder conditions and decision copy
-- Visible "Last updated" timestamp (placeholder)
-- Mock SVG map with clickable pins
+- Leaflet + OSM map
+- Click-to-drop named pins (ephemeral)
+- Pin popups with NOAA placeholder + Windy embed
+- Generic in-page detail panel fed by location state
+- Frontend-only architecture
 
 ## Out of scope (for now)
 
-- NOAA or any live API integration
-- Data transformers, sync, or business-rule engines
-- Authentication / sign-up
-- Multi-page routing
-- Local storage or backend state
+- NOAA live API fetch
+- Backend or persistent storage
+- Authentication
+- Route-based detail pages
+- Nearest-buoy lookup logic
 
 ## Development
 
