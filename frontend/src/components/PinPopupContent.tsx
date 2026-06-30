@@ -3,7 +3,7 @@ import { formatCoords, windyEmbedUrl } from '../types/location'
 
 type PinPopupContentProps = {
   pin: LocationPin
-  onOpen: (pin: LocationPin) => void
+  onOpen: () => void
 }
 
 function PinPopupContent({ pin, onOpen }: PinPopupContentProps) {
@@ -43,12 +43,15 @@ function PinPopupContent({ pin, onOpen }: PinPopupContentProps) {
         />
       </section>
 
+      <p className="pin-popup__cta-hint">
+        Need more detail? Expand this spot in the panel below the map.
+      </p>
       <button
         type="button"
         className="btn btn--primary pin-popup__open"
-        onClick={() => onOpen(pin)}
+        onClick={onOpen}
       >
-        Open
+        View full spot detail below
       </button>
     </div>
   )

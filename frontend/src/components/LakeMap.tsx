@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { MapContainer, Marker, Popup, TileLayer, useMapEvents } from 'react-leaflet'
+import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import type { LocationPin } from '../types/location'
 import PinPopupContent from './PinPopupContent'
@@ -28,6 +28,22 @@ function MapClickHandler({ onMapClick }: MapClickHandlerProps) {
   return null
 }
 
+type PinPopupWithOpenProps = {
+  pin: LocationPin
+  onOpenDetail: (pin: LocationPin) => void
+}
+
+function PinPopupWithOpen({ pin, onOpenDetail }: PinPopupWithOpenProps) {
+  const map = useMap()
+
+  const handleOpen = () => {
+    onOpenDetail(pin)
+    map.closePopup()
+  }
+
+  return <PinPopupContent pin={pin} onOpen={handleOpen} />
+}
+
 type LakeMapProps = {
   pins: LocationPin[]
   onMapClick: (lat: number, lng: number) => void
@@ -39,8 +55,15 @@ function LakeMap({ pins, onMapClick, onOpenDetail }: LakeMapProps) {
     () =>
       pins.map((pin) => (
         <Marker key={pin.id} position={[pin.lat, pin.lng]} icon={pinIcon}>
-          <Popup minWidth={260} maxWidth={320}>
-            <PinPopupContent pin={pin} onOpen={onOpenDetail} />
+          <Popup
+            minWidth={260}
+            maxWidth={320}
+            maxHeight={260}
+            className="pin-popup-wrapper"
+            autoPan
+            autoPanPadding={[16, 16]}
+          >
+            <PinPopupWithOpen pin={pin} onOpenDetail={onOpenDetail} />
           </Popup>
         </Marker>
       )),
