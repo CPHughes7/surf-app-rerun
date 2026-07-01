@@ -277,6 +277,159 @@
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 
+.lake-pin-icon--selected .lake-pin-icon__dot {
+  width: 18px;
+  height: 18px;
+  margin: 1px;
+  background: #0d9488;
+  border-width: 3px;
+}
+
+.map-zone__message {
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 0 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+  background: rgba(13, 148, 136, 0.12);
+  border: 1px solid rgba(13, 148, 136, 0.35);
+  color: var(--text);
+}
+
+.left-drawer__region-group {
+  margin-bottom: 12px;
+}
+
+.left-drawer__region-group ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pin-popup__region,
+.bottom-detail__region {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.surfability-block {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.surfability-block--compact {
+  margin-bottom: 8px;
+}
+
+.surfability-block__summary {
+  flex: 1 1 100%;
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.surfability-block__summary--detail {
+  margin: 0 0 12px;
+}
+
+.surfability-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.surfability-badge--good {
+  background: rgba(22, 163, 74, 0.15);
+  color: #15803d;
+}
+
+.surfability-badge--marginal {
+  background: rgba(234, 179, 8, 0.18);
+  color: #a16207;
+}
+
+.surfability-badge--poor {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+}
+
+.surfability-badge--warn {
+  background: rgba(249, 115, 22, 0.14);
+  color: #c2410c;
+}
+
+.surfability-badge--neutral {
+  background: var(--border);
+  color: var(--text-muted);
+}
+
+.confidence-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--border);
+  color: var(--text-muted);
+}
+
+.confidence-badge--high {
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+}
+
+.confidence-badge--medium {
+  background: rgba(234, 179, 8, 0.15);
+  color: #a16207;
+}
+
+.confidence-badge--low {
+  background: rgba(239, 68, 68, 0.1);
+  color: #b91c1c;
+}
+
+.noaa-readings__status {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.noaa-readings__status--error {
+  color: #b91c1c;
+}
+
+.noaa-readings__status--warn {
+  color: #c2410c;
+}
+
+.noaa-readings__inference {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.noaa-readings__section {
+  margin-bottom: 14px;
+}
+
+.noaa-readings__section-title {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
 /* Bottom panel */
 .bottom-panel {
   flex-shrink: 0;

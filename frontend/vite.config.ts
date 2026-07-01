@@ -8,4 +8,13 @@ export default defineConfig({
     react(),
     babel({ presets: [reactCompilerPreset()] })
   ],
+  server: {
+    proxy: {
+      '/api/ndbc/latest_obs.txt': {
+        target: 'https://www.ndbc.noaa.gov',
+        changeOrigin: true,
+        rewrite: () => '/data/latest_obs/latest_obs.txt',
+      },
+    },
+  },
 })

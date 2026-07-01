@@ -1,18 +1,28 @@
 import { useMemo } from 'react'
 import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
+import { SURF_SPOTS } from '../data/surfSpots'
 import type { LocationPin } from '../types/location'
+import { spotToPin } from '../types/location'
 import PinPopupContent from './PinPopupContent'
 
 const LAKE_MICHIGAN_CENTER: [number, number] = [44.0, -86.5]
 const LAKE_MICHIGAN_ZOOM = 6
 
-const pinIcon = L.divIcon({
+const spotIcon = L.divIcon({
   className: 'lake-pin-icon',
   html: '<span class="lake-pin-icon__dot"></span>',
   iconSize: [20, 20],
   iconAnchor: [10, 10],
   popupAnchor: [0, -10],
+})
+
+const selectedSpotIcon = L.divIcon({
+  className: 'lake-pin-icon lake-pin-icon--selected',
+  html: '<span class="lake-pin-icon__dot"></span>',
+  iconSize: [24, 24],
+  iconAnchor: [12, 12],
+  popupAnchor: [0, -12],
 })
 
 type MapClickHandlerProps = {
@@ -45,29 +55,41 @@ function PinPopupWithOpen({ pin, onOpenDetail }: PinPopupWithOpenProps) {
 }
 
 type LakeMapProps = {
-  pins: LocationPin[]
+  selectedSpotId: string | null
   onMapClick: (lat: number, lng: number) => void
+  onSelectSpot: (pin: LocationPin) => void
   onOpenDetail: (pin: LocationPin) => void
 }
 
-function LakeMap({ pins, onMapClick, onOpenDetail }: LakeMapProps) {
+function LakeMap({ selectedSpotId, onMapClick, onSelectSpot, onOpenDetail }: LakeMapProps) {
   const markers = useMemo(
     () =>
-      pins.map((pin) => (
-        <Marker key={pin.id} position={[pin.lat, pin.lng]} icon={pinIcon}>
-          <Popup
-            minWidth={260}
-            maxWidth={320}
-            maxHeight={260}
-            className="pin-popup-wrapper"
-            autoPan
-            autoPanPadding={[16, 16]}
+      SURF_SPOTS.map((spot) => {
+        const pin = spotToPin(spot)
+        const isSelected = spot.id === selectedSpotId
+        return (
+          <Marker
+            key={spot.id}
+            position={[spot.lat, spot.lng]}
+            icon={isSelected ? selectedSpotIcon : spotIcon}
+            eventHandlers={{
+              click: () => onSelectSpot(pin),
+            }}
           >
-            <PinPopupWithOpen pin={pin} onOpenDetail={onOpenDetail} />
-          </Popup>
-        </Marker>
-      )),
-    [pins, onOpenDetail],
+            <Popup
+              minWidth={260}
+              maxWidth={320}
+              maxHeight={320}
+              className="pin-popup-wrapper"
+              autoPan
+              autoPanPadding={[16, 16]}
+            >
+              <PinPopupWithOpen pin={pin} onOpenDetail={onOpenDetail} />
+            </Popup>
+          </Marker>
+        )
+      }),
+    [selectedSpotId, onSelectSpot, onOpenDetail],
   )
 
   return (

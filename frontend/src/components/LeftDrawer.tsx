@@ -1,78 +1,90 @@
+import { SURF_SPOTS } from '../data/surfSpots'
 import type { LocationPin } from '../types/location'
 import { formatCoords } from '../types/location'
 
 type LeftDrawerProps = {
-  pins: LocationPin[]
-  selectedPinId: string | null
+  spots: typeof SURF_SPOTS
+  selectedSpotId: string | null
+  selectedPin: LocationPin | null
   isOpen: boolean
-  onSelectPin: (pinId: string) => void
+  onSelectSpot: (spotId: string) => void
   onClose: () => void
 }
 
-function LeftDrawer({ pins, selectedPinId, isOpen, onSelectPin, onClose }: LeftDrawerProps) {
-  const selectedPin = pins.find((pin) => pin.id === selectedPinId) ?? null
+function LeftDrawer({
+  spots,
+  selectedSpotId,
+  selectedPin,
+  isOpen,
+  onSelectSpot,
+  onClose,
+}: LeftDrawerProps) {
+  const regions = [...new Set(spots.map((s) => s.region))]
 
   return (
     <aside
       id="pins-drawer"
       className={isOpen ? 'left-drawer' : 'left-drawer is-closed'}
-      aria-label="Session pins"
+      aria-label="Surf spots"
       aria-hidden={!isOpen}
     >
       <div className="left-drawer__toolbar">
-        <p className="left-drawer__label">Session pins</p>
+        <p className="left-drawer__label">Surf spots</p>
         <button
           type="button"
           className="btn btn--ghost left-drawer__close"
           onClick={onClose}
-          aria-label="Close pins drawer"
+          aria-label="Close spots drawer"
         >
           Close
         </button>
       </div>
       <div className="left-drawer__meta">
-        <p className="left-drawer__count">{pins.length}</p>
-        <span className="placeholder-badge">Ephemeral · refresh clears</span>
+        <p className="left-drawer__count">{spots.length}</p>
+        <span className="placeholder-badge">Lake Michigan catalog</span>
       </div>
 
       {selectedPin ? (
-        <section className="left-drawer__summary" aria-label="Selected pin">
+        <section className="left-drawer__summary" aria-label="Selected spot">
           <p className="left-drawer__label">Selected</p>
           <h2>{selectedPin.name}</h2>
           <p className="left-drawer__coords">{formatCoords(selectedPin.lat, selectedPin.lng)}</p>
+          <p className="left-drawer__region">{selectedPin.region}</p>
         </section>
       ) : (
         <section className="left-drawer__summary left-drawer__summary--empty">
           <p className="left-drawer__label">Selected</p>
-          <p>No pin selected yet. Drop one on the map or pick from the list.</p>
+          <p>Pick a catalog spot from the map or list below.</p>
         </section>
       )}
 
-      <nav className="left-drawer__list" aria-label="All session pins">
-        <p className="left-drawer__label">All pins</p>
-        {pins.length === 0 ? (
-          <p className="left-drawer__empty">No pins this session.</p>
-        ) : (
-          <ul>
-            {pins.map((pin) => (
-              <li key={pin.id}>
-                <button
-                  type="button"
-                  className={
-                    pin.id === selectedPinId ? 'pin-list-btn is-active' : 'pin-list-btn'
-                  }
-                  onClick={() => onSelectPin(pin.id)}
-                  aria-pressed={pin.id === selectedPinId}
-                >
-                  <span className="pin-list-btn__name">{pin.name}</span>
-                  <span className="pin-list-btn__coords">
-                    {formatCoords(pin.lat, pin.lng)}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+      <nav className="left-drawer__list" aria-label="Lake Michigan surf spots">
+        {regions.map((region) => (
+          <div key={region} className="left-drawer__region-group">
+            <p className="left-drawer__label">{region}</p>
+            <ul>
+              {spots
+                .filter((s) => s.region === region)
+                .map((spot) => (
+                  <li key={spot.id}>
+                    <button
+                      type="button"
+                      className={
+                        spot.id === selectedSpotId ? 'pin-list-btn is-active' : 'pin-list-btn'
+                      }
+                      onClick={() => onSelectSpot(spot.id)}
+                      aria-pressed={spot.id === selectedSpotId}
+                    >
+                      <span className="pin-list-btn__name">{spot.name}</span>
+                      <span className="pin-list-btn__coords">
+                        {formatCoords(spot.lat, spot.lng)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          </div>
+        ))}
       </nav>
     </aside>
   )

@@ -1,47 +1,76 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
+import { SURF_SPOTS } from './data/surfSpots'
+import { getSpotById } from './data/surfSpots'
+import { snapToNearestSpot } from './lib/geo/snapToSpot'
 import LakeMap from './components/LakeMap'
 import LeftDrawer from './components/LeftDrawer'
 import LocationDetailPanel from './components/LocationDetailPanel'
-import NamePinDialog from './components/NamePinDialog'
-import type { LocationPin, PendingPin } from './types/location'
+import type { LocationPin } from './types/location'
+import { spotToPin } from './types/location'
 import './App.css'
 
 function App() {
-  const [pins, setPins] = useState<LocationPin[]>([])
-  const [pendingPin, setPendingPin] = useState<PendingPin | null>(null)
-  const [selectedPinId, setSelectedPinId] = useState<string | null>(null)
+  const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null)
   const [detailPin, setDetailPin] = useState<LocationPin | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(true)
   const [detailJustOpened, setDetailJustOpened] = useState(false)
+  const [mapMessage, setMapMessage] = useState<string | null>(null)
   const bottomPanelRef = useRef<HTMLDivElement>(null)
+  const messageTimerRef = useRef<number | null>(null)
 
-  const handleMapClick = useCallback((lat: number, lng: number) => {
-    setPendingPin({ lat, lng })
+  const selectedPin = useMemo(() => {
+    if (!selectedSpotId) return null
+    const spot = getSpotById(selectedSpotId)
+    return spot ? spotToPin(spot) : null
+  }, [selectedSpotId])
+
+  const showMapMessage = useCallback((message: string) => {
+    setMapMessage(message)
+    if (messageTimerRef.current) window.clearTimeout(messageTimerRef.current)
+    messageTimerRef.current = window.setTimeout(() => setMapMessage(null), 4000)
   }, [])
 
-  const handleSavePin = useCallback(
-    (name: string) => {
-      if (!pendingPin) return
-      const pin: LocationPin = {
-        id: crypto.randomUUID(),
-        name,
-        lat: pendingPin.lat,
-        lng: pendingPin.lng,
-        createdAt: new Date().toISOString(),
+  const selectSpot = useCallback((spotId: string) => {
+    const spot = getSpotById(spotId)
+    if (!spot) return
+    setSelectedSpotId(spot.id)
+    setDetailPin(spotToPin(spot))
+  }, [])
+
+  const handleMapClick = useCallback(
+    (lat: number, lng: number) => {
+      const result = snapToNearestSpot(lat, lng)
+      if (result.ok) {
+        selectSpot(result.spot.id)
+        showMapMessage(`Snapped to ${result.spot.name}`)
+      } else if (result.nearestSpot && result.nearestDistanceM !== null) {
+        const km = (result.nearestDistanceM / 1000).toFixed(1)
+        showMapMessage(
+          `Outside surf spots. Nearest is ${result.nearestSpot.name} (${km} km away). Pick from the catalog.`,
+        )
+      } else {
+        showMapMessage('Click closer to a catalog surf spot.')
       }
-      setPins((current) => [...current, pin])
-      setSelectedPinId(pin.id)
-      setPendingPin(null)
     },
-    [pendingPin],
+    [selectSpot, showMapMessage],
   )
 
-  const handleSelectPin = useCallback((pinId: string) => {
-    setSelectedPinId(pinId)
-  }, [])
+  const handleSelectSpotFromDrawer = useCallback(
+    (spotId: string) => {
+      selectSpot(spotId)
+    },
+    [selectSpot],
+  )
+
+  const handleSelectSpotFromMap = useCallback(
+    (pin: LocationPin) => {
+      selectSpot(pin.spotId)
+    },
+    [selectSpot],
+  )
 
   const handleOpenDetail = useCallback((pin: LocationPin) => {
-    setSelectedPinId(pin.id)
+    setSelectedSpotId(pin.spotId)
     setDetailPin(pin)
     setDetailJustOpened(true)
 
@@ -63,13 +92,13 @@ function App() {
             aria-expanded={drawerOpen}
             aria-controls="pins-drawer"
           >
-            {drawerOpen ? 'Hide pins' : 'Show pins'}
+            {drawerOpen ? 'Hide spots' : 'Show spots'}
           </button>
         </div>
         <div className="app-header__center">
           <h1>Lake Surf</h1>
           <p className="app-header__tagline">
-            Drop a pin on the map, then review NOAA and Windy for that spot.
+            Select a Lake Michigan surf spot, then review live NOAA buoy data and Windy forecast.
           </p>
         </div>
         <div className="app-header__side app-header__side--right" aria-hidden="true" />
@@ -77,17 +106,30 @@ function App() {
 
       <div className="app-body">
         <LeftDrawer
-          pins={pins}
-          selectedPinId={selectedPinId}
+          spots={SURF_SPOTS}
+          selectedSpotId={selectedSpotId}
+          selectedPin={selectedPin}
           isOpen={drawerOpen}
-          onSelectPin={handleSelectPin}
+          onSelectSpot={handleSelectSpotFromDrawer}
           onClose={() => setDrawerOpen(false)}
         />
 
         <section className="main-column">
           <div className="map-zone">
-            <p className="map-zone__hint">Click the map to drop a named pin</p>
-            <LakeMap pins={pins} onMapClick={handleMapClick} onOpenDetail={handleOpenDetail} />
+            <p className="map-zone__hint">
+              Click a spot marker or snap-click within ~15 km of a catalog break
+            </p>
+            {mapMessage && (
+              <p className="map-zone__message" role="status">
+                {mapMessage}
+              </p>
+            )}
+            <LakeMap
+              selectedSpotId={selectedSpotId}
+              onMapClick={handleMapClick}
+              onSelectSpot={handleSelectSpotFromMap}
+              onOpenDetail={handleOpenDetail}
+            />
           </div>
 
           <div className="bottom-panel" ref={bottomPanelRef}>
@@ -101,22 +143,14 @@ function App() {
               <div className="bottom-panel__placeholder">
                 <p className="bottom-panel__label">Spot detail</p>
                 <p>
-                  Click a pin on the map, then choose <strong>Open full detail below</strong> in
-                  the popup to review conditions here.
+                  Select a catalog spot on the map or in the drawer to load NOAA buoy readings and
+                  Windy forecast below.
                 </p>
               </div>
             )}
           </div>
         </section>
       </div>
-
-      {pendingPin && (
-        <NamePinDialog
-          pendingPin={pendingPin}
-          onSave={handleSavePin}
-          onCancel={() => setPendingPin(null)}
-        />
-      )}
     </div>
   )
 }

@@ -1,14 +1,29 @@
+import type { SurfSpot } from '../data/surfSpots'
+
 export type LocationPin = {
   id: string
+  spotId: string
   name: string
   lat: number
   lng: number
+  region: string
+  windStationId: string
+  waveReferenceBuoyId: string
   createdAt: string
 }
 
-export type PendingPin = {
-  lat: number
-  lng: number
+export function spotToPin(spot: SurfSpot): LocationPin {
+  return {
+    id: spot.id,
+    spotId: spot.id,
+    name: spot.name,
+    lat: spot.lat,
+    lng: spot.lng,
+    region: spot.region,
+    windStationId: spot.windStationId,
+    waveReferenceBuoyId: spot.waveReferenceBuoyId,
+    createdAt: new Date().toISOString(),
+  }
 }
 
 export function formatCoords(lat: number, lng: number): string {
@@ -43,3 +58,15 @@ export function windyEmbedUrl(lat: number, lng: number): string {
   })
   return `https://embed.windy.com/embed2.html?${params.toString()}`
 }
+
+function formatValue(value: number | null, unit: string, decimals = 1): string {
+  if (value === null) return '—'
+  return `${value.toFixed(decimals)} ${unit}`
+}
+
+export function formatObservedAt(iso: string | null): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString()
+}
+
+export { formatValue }
