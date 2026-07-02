@@ -42,6 +42,12 @@ Live NOAA fetches work in **local dev** through the Vite proxy. The deployed S3 
 
 See [frontend/src/docs/MVP_VALIDATION.md](frontend/src/docs/MVP_VALIDATION.md) for validation steps.
 
+## Branching
+
+- **`learn/v1`** — frozen learning snapshot (tag: `learn-v1-snapshot`); reference only, no feature work
+- **`dev/rebuild`** — active agent-driven development; large refactors and experiments welcome
+- **`main`** — production deploy target; merge from `dev/rebuild` when ready to ship
+
 ## Data model
 
 - **Wind:** nearshore C-MAN / pier stations (`CHII2`, `MCYI3`, `SVNM4`, etc.)
