@@ -1,9 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, type FormEvent } from 'react'
 import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
-import { SURF_SPOTS } from '../data/surfSpots'
 import type { LocationPin } from '../types/location'
-import { spotToPin } from '../types/location'
 import PinPopupContent from './PinPopupContent'
 
 const LAKE_MICHIGAN_CENTER: [number, number] = [44.0, -86.5]
@@ -41,9 +39,34 @@ function MapClickHandler({ onMapClick }: MapClickHandlerProps) {
 type PinPopupWithOpenProps = {
   pin: LocationPin
   onOpenDetail: (pin: LocationPin) => void
+  onEdit: (pin: LocationPin) => void
+  onDelete: (pinId: string) => void
+  isEditing: boolean
+  editName: string
+  editLat: string
+  editLng: string
+  onEditNameChange: (value: string) => void
+  onEditLatChange: (value: string) => void
+  onEditLngChange: (value: string) => void
+  onSaveEdit: (event: FormEvent<HTMLFormElement>, pinId: string) => void
+  onCancelEdit: () => void
 }
 
-function PinPopupWithOpen({ pin, onOpenDetail }: PinPopupWithOpenProps) {
+function PinPopupWithOpen({
+  pin,
+  onOpenDetail,
+  onEdit,
+  onDelete,
+  isEditing,
+  editName,
+  editLat,
+  editLng,
+  onEditNameChange,
+  onEditLatChange,
+  onEditLngChange,
+  onSaveEdit,
+  onCancelEdit,
+}: PinPopupWithOpenProps) {
   const map = useMap()
 
   const handleOpen = () => {
@@ -51,26 +74,99 @@ function PinPopupWithOpen({ pin, onOpenDetail }: PinPopupWithOpenProps) {
     map.closePopup()
   }
 
-  return <PinPopupContent pin={pin} onOpen={handleOpen} />
+  if (isEditing) {
+    return (
+      <form onSubmit={(event) => void onSaveEdit(event, pin.id)}>
+        <label>
+          Name
+          <input value={editName} onChange={(e) => onEditNameChange(e.target.value)} />
+        </label>
+        <label>
+          Lat
+          <input value={editLat} onChange={(e) => onEditLatChange(e.target.value)} />
+        </label>
+        <label>
+          Lng
+          <input value={editLng} onChange={(e) => onEditLngChange(e.target.value)} />
+        </label>
+        <button type="submit">Save</button>
+        <button type="button" onClick={onCancelEdit}>
+          Cancel
+        </button>
+      </form>
+    )
+  }
+
+  return (
+    <div>
+      <PinPopupContent pin={pin} onOpen={handleOpen} />
+      <div className="pin-popup__actions">
+        <button type="button" onClick={() => onEdit(pin)}>
+          Edit
+        </button>
+        <button type="button" onClick={() => onDelete(pin.id)}>
+          Delete
+        </button>
+      </div>
+    </div>
+  )
 }
 
 type LakeMapProps = {
+  pins: LocationPin[]
   selectedSpotId: string | null
+  pendingLocation: [number, number] | null
+  newSpotName: string
+  editingSpotId: string | null
+  editName: string
+  editLat: string
+  editLng: string
   onMapClick: (lat: number, lng: number) => void
   onSelectSpot: (pin: LocationPin) => void
   onOpenDetail: (pin: LocationPin) => void
+  onNewSpotNameChange: (value: string) => void
+  onAddSpot: (event: FormEvent<HTMLFormElement>) => void
+  onCancelAdd: () => void
+  onEdit: (pin: LocationPin) => void
+  onDelete: (pinId: string) => void
+  onEditNameChange: (value: string) => void
+  onEditLatChange: (value: string) => void
+  onEditLngChange: (value: string) => void
+  onSaveEdit: (event: FormEvent<HTMLFormElement>, pinId: string) => void
+  onCancelEdit: () => void
 }
 
-function LakeMap({ selectedSpotId, onMapClick, onSelectSpot, onOpenDetail }: LakeMapProps) {
+function LakeMap({
+  pins,
+  selectedSpotId,
+  pendingLocation,
+  newSpotName,
+  editingSpotId,
+  editName,
+  editLat,
+  editLng,
+  onMapClick,
+  onSelectSpot,
+  onOpenDetail,
+  onNewSpotNameChange,
+  onAddSpot,
+  onCancelAdd,
+  onEdit,
+  onDelete,
+  onEditNameChange,
+  onEditLatChange,
+  onEditLngChange,
+  onSaveEdit,
+  onCancelEdit,
+}: LakeMapProps) {
   const markers = useMemo(
     () =>
-      SURF_SPOTS.map((spot) => {
-        const pin = spotToPin(spot)
-        const isSelected = spot.id === selectedSpotId
+      pins.map((pin) => {
+        const isSelected = pin.id === selectedSpotId
         return (
           <Marker
-            key={spot.id}
-            position={[spot.lat, spot.lng]}
+            key={pin.id}
+            position={[pin.lat, pin.lng]}
             icon={isSelected ? selectedSpotIcon : spotIcon}
             eventHandlers={{
               click: () => onSelectSpot(pin),
@@ -79,17 +175,47 @@ function LakeMap({ selectedSpotId, onMapClick, onSelectSpot, onOpenDetail }: Lak
             <Popup
               minWidth={260}
               maxWidth={320}
-              maxHeight={320}
+              maxHeight={360}
               className="pin-popup-wrapper"
               autoPan
               autoPanPadding={[16, 16]}
             >
-              <PinPopupWithOpen pin={pin} onOpenDetail={onOpenDetail} />
+              <PinPopupWithOpen
+                pin={pin}
+                onOpenDetail={onOpenDetail}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                isEditing={editingSpotId === pin.id}
+                editName={editName}
+                editLat={editLat}
+                editLng={editLng}
+                onEditNameChange={onEditNameChange}
+                onEditLatChange={onEditLatChange}
+                onEditLngChange={onEditLngChange}
+                onSaveEdit={onSaveEdit}
+                onCancelEdit={onCancelEdit}
+              />
             </Popup>
           </Marker>
         )
       }),
-    [selectedSpotId, onSelectSpot, onOpenDetail],
+    [
+      pins,
+      selectedSpotId,
+      editingSpotId,
+      editName,
+      editLat,
+      editLng,
+      onSelectSpot,
+      onOpenDetail,
+      onEdit,
+      onDelete,
+      onEditNameChange,
+      onEditLatChange,
+      onEditLngChange,
+      onSaveEdit,
+      onCancelEdit,
+    ],
   )
 
   return (
@@ -105,6 +231,23 @@ function LakeMap({ selectedSpotId, onMapClick, onSelectSpot, onOpenDetail }: Lak
       />
       <MapClickHandler onMapClick={onMapClick} />
       {markers}
+      {pendingLocation && (
+        <Popup position={pendingLocation}>
+          <form onSubmit={(event) => void onAddSpot(event)}>
+            <p>
+              Add location at {pendingLocation[0].toFixed(4)}, {pendingLocation[1].toFixed(4)}
+            </p>
+            <label>
+              Name
+              <input value={newSpotName} onChange={(e) => onNewSpotNameChange(e.target.value)} />
+            </label>
+            <button type="submit">Add spot</button>
+            <button type="button" onClick={onCancelAdd}>
+              Cancel
+            </button>
+          </form>
+        </Popup>
+      )}
     </MapContainer>
   )
 }

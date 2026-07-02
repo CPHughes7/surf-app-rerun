@@ -1,9 +1,8 @@
-import { SURF_SPOTS } from '../data/surfSpots'
 import type { LocationPin } from '../types/location'
 import { formatCoords } from '../types/location'
 
 type LeftDrawerProps = {
-  spots: typeof SURF_SPOTS
+  pins: LocationPin[]
   selectedSpotId: string | null
   selectedPin: LocationPin | null
   isOpen: boolean
@@ -12,14 +11,14 @@ type LeftDrawerProps = {
 }
 
 function LeftDrawer({
-  spots,
+  pins,
   selectedSpotId,
   selectedPin,
   isOpen,
   onSelectSpot,
   onClose,
 }: LeftDrawerProps) {
-  const regions = [...new Set(spots.map((s) => s.region))]
+  const regions = [...new Set(pins.map((pin) => pin.region))].sort()
 
   return (
     <aside
@@ -40,8 +39,8 @@ function LeftDrawer({
         </button>
       </div>
       <div className="left-drawer__meta">
-        <p className="left-drawer__count">{spots.length}</p>
-        <span className="placeholder-badge">Lake Michigan catalog</span>
+        <p className="left-drawer__count">{pins.length}</p>
+        <span className="placeholder-badge">Saved locations</span>
       </div>
 
       {selectedPin ? (
@@ -54,7 +53,7 @@ function LeftDrawer({
       ) : (
         <section className="left-drawer__summary left-drawer__summary--empty">
           <p className="left-drawer__label">Selected</p>
-          <p>Pick a catalog spot from the map or list below.</p>
+          <p>Pick a spot from the map or list below.</p>
         </section>
       )}
 
@@ -63,21 +62,21 @@ function LeftDrawer({
           <div key={region} className="left-drawer__region-group">
             <p className="left-drawer__label">{region}</p>
             <ul>
-              {spots
-                .filter((s) => s.region === region)
-                .map((spot) => (
-                  <li key={spot.id}>
+              {pins
+                .filter((pin) => pin.region === region)
+                .map((pin) => (
+                  <li key={pin.id}>
                     <button
                       type="button"
                       className={
-                        spot.id === selectedSpotId ? 'pin-list-btn is-active' : 'pin-list-btn'
+                        pin.id === selectedSpotId ? 'pin-list-btn is-active' : 'pin-list-btn'
                       }
-                      onClick={() => onSelectSpot(spot.id)}
-                      aria-pressed={spot.id === selectedSpotId}
+                      onClick={() => onSelectSpot(pin.id)}
+                      aria-pressed={pin.id === selectedSpotId}
                     >
-                      <span className="pin-list-btn__name">{spot.name}</span>
+                      <span className="pin-list-btn__name">{pin.name}</span>
                       <span className="pin-list-btn__coords">
-                        {formatCoords(spot.lat, spot.lng)}
+                        {formatCoords(pin.lat, pin.lng)}
                       </span>
                     </button>
                   </li>

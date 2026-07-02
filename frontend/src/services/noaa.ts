@@ -1,4 +1,5 @@
 import {
+  MAX_NEARSHORE_WIND_KM,
   MAX_WAVE_REFERENCE_KM,
   NEARSHORE_STATIONS,
   WAVE_CAPABLE_OFFSHORE_BUOYS,
@@ -145,17 +146,19 @@ function resolveWind(
     const primaryObs = observations.get(primary.id)
     if (primaryObs && hasWindData(primaryObs)) {
       const distanceKm = haversineDistanceKm(spot.lat, spot.lng, primary.lat, primary.lng)
-      const isStale = isObservationStale(primaryObs.observedAt)
-      return {
-        stationId: primary.id,
-        stationName: primary.name,
-        stationKind: primary.kind,
-        distanceKm,
-        observedAt: primaryObs.observedAt?.toISOString() ?? null,
-        isStale,
-        speedKt: primaryObs.windSpeedKt,
-        dirDeg: primaryObs.windDirDeg,
-        gustKt: primaryObs.gustKt,
+      if (distanceKm <= MAX_NEARSHORE_WIND_KM) {
+        const isStale = isObservationStale(primaryObs.observedAt)
+        return {
+          stationId: primary.id,
+          stationName: primary.name,
+          stationKind: primary.kind,
+          distanceKm,
+          observedAt: primaryObs.observedAt?.toISOString() ?? null,
+          isStale,
+          speedKt: primaryObs.windSpeedKt,
+          dirDeg: primaryObs.windDirDeg,
+          gustKt: primaryObs.gustKt,
+        }
       }
     }
   }
@@ -171,6 +174,7 @@ function resolveWind(
     const obs = observations.get(station.id)
     if (!obs || !hasWindData(obs)) continue
     const distanceKm = haversineDistanceKm(spot.lat, spot.lng, station.lat, station.lng)
+    if (distanceKm > MAX_NEARSHORE_WIND_KM) continue
     if (!best || distanceKm < best.distanceKm) {
       best = { station, obs, distanceKm }
     }

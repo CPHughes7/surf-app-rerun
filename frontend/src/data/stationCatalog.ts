@@ -33,6 +33,7 @@ export const WAVE_CAPABLE_OFFSHORE_BUOYS: Station[] = [
 ]
 
 export const MAX_WAVE_REFERENCE_KM = 80
+export const MAX_NEARSHORE_WIND_KM = 50
 
 const ALL_STATIONS: Station[] = [...NEARSHORE_STATIONS, ...WAVE_CAPABLE_OFFSHORE_BUOYS]
 

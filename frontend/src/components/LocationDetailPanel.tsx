@@ -11,7 +11,7 @@ type LocationDetailPanelProps = {
 }
 
 function LocationDetailPanel({ pin, justOpened = false, onClose }: LocationDetailPanelProps) {
-  const buoyData = useBuoyData(pin.spotId)
+  const buoyData = useBuoyData(pin)
 
   return (
     <section

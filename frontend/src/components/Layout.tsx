@@ -20,15 +20,6 @@ function Layout() {
                         <ListItemButton component={Link} to="/">
                             <ListItemText primary="Home" />
                         </ListItemButton>
-                        <ListItemButton component={Link} to="/Devv1">
-                            <ListItemText primary="Devv1" />
-                        </ListItemButton>
-                        <ListItemButton component={Link} to="/Test">
-                            <ListItemText primary="Test" />
-                        </ListItemButton>
-                        <ListItemButton component={Link} to="/Share">
-                            <ListItemText primary="Share" />
-                        </ListItemButton>
                     </List>
                 </Box>
             </Drawer>

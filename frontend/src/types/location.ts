@@ -26,6 +26,18 @@ export function spotToPin(spot: SurfSpot): LocationPin {
   }
 }
 
+export function pinToSurfSpot(pin: LocationPin): SurfSpot {
+  return {
+    id: pin.spotId,
+    name: pin.name,
+    lat: pin.lat,
+    lng: pin.lng,
+    region: pin.region,
+    windStationId: pin.windStationId,
+    waveReferenceBuoyId: pin.waveReferenceBuoyId,
+  }
+}
+
 export function formatCoords(lat: number, lng: number): string {
   const latDir = lat >= 0 ? 'N' : 'S'
   const lngDir = lng >= 0 ? 'E' : 'W'

@@ -9,7 +9,7 @@ type PinPopupContentProps = {
 }
 
 function PinPopupContent({ pin, onOpen }: PinPopupContentProps) {
-  const buoyData = useBuoyData(pin.spotId)
+  const buoyData = useBuoyData(pin)
 
   return (
     <div className="pin-popup">
