@@ -40,7 +40,7 @@ npm run test:data   # validate station mapping against live NDBC (direct, Node)
 
 Live NOAA fetches work in **local dev** through the Vite proxy. The deployed S3 build still needs a production proxy (`VITE_NDBC_URL`) — not wired yet.
 
-See [frontend/src/docs/MVP_VALIDATION.md](frontend/src/docs/MVP_VALIDATION.md) for validation steps.
+See [frontend/src/docs/MVP_VALIDATION.md](frontend/src/docs/MVP_VALIDATION.md) for validation steps and [frontend/src/docs/NDBC_PIPELINE.md](frontend/src/docs/NDBC_PIPELINE.md) for the full NOAA data pipeline narrative.
 
 ## Branching
 

@@ -32,15 +32,8 @@ function PinPopupContent({ pin, onOpen }: PinPopupContentProps) {
         />
       </section>
 
-      <p className="pin-popup__cta-hint">
-        Need more detail? Expand this spot in the panel below the map.
-      </p>
-      <button
-        type="button"
-        className="btn btn--primary pin-popup__open"
-        onClick={onOpen}
-      >
-        View full spot detail below
+      <button type="button" className="btn btn--primary pin-popup__open" onClick={onOpen}>
+        View in Locations
       </button>
     </div>
   )

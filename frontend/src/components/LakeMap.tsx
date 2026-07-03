@@ -1,4 +1,4 @@
-import { useMemo, type FormEvent } from 'react'
+import { useEffect, useMemo, type FormEvent } from 'react'
 import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import type { LocationPin } from '../types/location'
@@ -33,6 +33,16 @@ function MapClickHandler({ onMapClick }: MapClickHandlerProps) {
       onMapClick(event.latlng.lat, event.latlng.lng)
     },
   })
+  return null
+}
+
+function ClosePopupsOnSignal({ signal }: { signal: number }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (signal > 0) map.closePopup()
+  }, [signal, map])
+
   return null
 }
 
@@ -115,6 +125,7 @@ function PinPopupWithOpen({
 type LakeMapProps = {
   pins: LocationPin[]
   selectedSpotId: string | null
+  popupDismissSignal: number
   pendingLocation: [number, number] | null
   newSpotName: string
   editingSpotId: string | null
@@ -122,7 +133,7 @@ type LakeMapProps = {
   editLat: string
   editLng: string
   onMapClick: (lat: number, lng: number) => void
-  onSelectSpot: (pin: LocationPin) => void
+  onMarkerClick: (pin: LocationPin) => void
   onOpenDetail: (pin: LocationPin) => void
   onNewSpotNameChange: (value: string) => void
   onAddSpot: (event: FormEvent<HTMLFormElement>) => void
@@ -139,6 +150,7 @@ type LakeMapProps = {
 function LakeMap({
   pins,
   selectedSpotId,
+  popupDismissSignal,
   pendingLocation,
   newSpotName,
   editingSpotId,
@@ -146,7 +158,7 @@ function LakeMap({
   editLat,
   editLng,
   onMapClick,
-  onSelectSpot,
+  onMarkerClick,
   onOpenDetail,
   onNewSpotNameChange,
   onAddSpot,
@@ -169,7 +181,7 @@ function LakeMap({
             position={[pin.lat, pin.lng]}
             icon={isSelected ? selectedSpotIcon : spotIcon}
             eventHandlers={{
-              click: () => onSelectSpot(pin),
+              click: () => onMarkerClick(pin),
             }}
           >
             <Popup
@@ -206,7 +218,7 @@ function LakeMap({
       editName,
       editLat,
       editLng,
-      onSelectSpot,
+      onMarkerClick,
       onOpenDetail,
       onEdit,
       onDelete,
@@ -230,6 +242,7 @@ function LakeMap({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <MapClickHandler onMapClick={onMapClick} />
+      <ClosePopupsOnSignal signal={popupDismissSignal} />
       {markers}
       {pendingLocation && (
         <Popup position={pendingLocation}>

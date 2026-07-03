@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   createLocation,
   deleteLocation,
@@ -7,16 +7,15 @@ import {
   updateLocation,
 } from '../api/locations'
 import LakeMap from '../components/LakeMap'
-import LeftDrawer from '../components/LeftDrawer'
-import LocationDetailPanel from '../components/LocationDetailPanel'
+import LocationsPanel, { type LocationsPanelView } from '../components/LocationsPanel'
 import type { LocationPin } from '../types/location'
 
 function Home() {
   const [pins, setPins] = useState<LocationPin[]>([])
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null)
-  const [detailPin, setDetailPin] = useState<LocationPin | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(true)
-  const [detailJustOpened, setDetailJustOpened] = useState(false)
+  const [panelOpen, setPanelOpen] = useState(true)
+  const [panelView, setPanelView] = useState<LocationsPanelView>('list')
+  const [popupDismissSignal, setPopupDismissSignal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
@@ -26,7 +25,6 @@ function Home() {
   const [editName, setEditName] = useState('')
   const [editLat, setEditLat] = useState('')
   const [editLng, setEditLng] = useState('')
-  const bottomPanelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     let active = true
@@ -57,24 +55,27 @@ function Home() {
     [pins, selectedSpotId],
   )
 
-  const selectPin = useCallback((pin: LocationPin) => {
+  const handleMarkerClick = useCallback((pin: LocationPin) => {
     setSelectedSpotId(pin.id)
-    setDetailPin(pin)
+    setPanelOpen(false)
+  }, [])
+
+  const openInLocationsPanel = useCallback((pin: LocationPin) => {
+    setSelectedSpotId(pin.id)
+    setPanelOpen(true)
+    setPanelView('detail')
+    setPopupDismissSignal((signal) => signal + 1)
+  }, [])
+
+  const handleBackToList = useCallback(() => {
+    setSelectedSpotId(null)
+    setPanelView('list')
   }, [])
 
   const handleMapClick = useCallback((lat: number, lng: number) => {
     setPendingLocation([lat, lng])
     setNewSpotName('')
-  }, [])
-
-  const handleOpenDetail = useCallback((pin: LocationPin) => {
-    setSelectedSpotId(pin.id)
-    setDetailPin(pin)
-    setDetailJustOpened(true)
-    requestAnimationFrame(() => {
-      bottomPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-    window.setTimeout(() => setDetailJustOpened(false), 1200)
+    setPanelOpen(false)
   }, [])
 
   const handleAddSpot = useCallback(
@@ -91,14 +92,14 @@ function Home() {
         })
         const pin = locationDtoToPin(created)
         setPins((current) => [...current, pin])
-        selectPin(pin)
+        openInLocationsPanel(pin)
         setNewSpotName('')
         setPendingLocation(null)
       } catch (err) {
         setActionError(err instanceof Error ? err.message : 'Unable to create location.')
       }
     },
-    [newSpotName, pendingLocation, selectPin],
+    [newSpotName, pendingLocation, openInLocationsPanel],
   )
 
   const handleEdit = useCallback((pin: LocationPin) => {
@@ -126,15 +127,12 @@ function Home() {
         })
         const pin = locationDtoToPin(updated)
         setPins((current) => current.map((p) => (p.id === pinId ? pin : p)))
-        if (selectedSpotId === pinId) {
-          setDetailPin(pin)
-        }
         setEditingSpotId(null)
       } catch (err) {
         setActionError(err instanceof Error ? err.message : 'Unable to update location.')
       }
     },
-    [editLat, editLng, editName, selectedSpotId],
+    [editLat, editLng, editName],
   )
 
   const handleDelete = useCallback(
@@ -147,7 +145,7 @@ function Home() {
         setPins((current) => current.filter((pin) => pin.id !== pinId))
         if (selectedSpotId === pinId) {
           setSelectedSpotId(null)
-          setDetailPin(null)
+          setPanelView('list')
         }
         setEditingSpotId(null)
       } catch (err) {
@@ -164,17 +162,23 @@ function Home() {
           <button
             type="button"
             className="btn btn--ghost drawer-toggle"
-            onClick={() => setDrawerOpen((open) => !open)}
-            aria-expanded={drawerOpen}
-            aria-controls="pins-drawer"
+            onClick={() => {
+              setPanelOpen((open) => {
+                const next = !open
+                if (next) setPopupDismissSignal((signal) => signal + 1)
+                return next
+              })
+            }}
+            aria-expanded={panelOpen}
+            aria-controls="locations-panel"
           >
-            {drawerOpen ? 'Hide spots' : 'Show spots'}
+            {panelOpen ? 'Hide Locations' : 'Locations'}
           </button>
         </div>
         <div className="app-header__center">
           <h1>Lake Surf</h1>
           <p className="app-header__tagline">
-            Add and manage surf locations, then review NOAA readings and Windy forecast.
+            Manage locations and review NOAA readings with Windy forecast.
           </p>
         </div>
         <div className="app-header__side app-header__side--right" aria-hidden="true" />
@@ -185,26 +189,29 @@ function Home() {
       {actionError && <p role="alert">Location action failed: {actionError}</p>}
 
       <div className="app-body">
-        <LeftDrawer
+        <LocationsPanel
           pins={pins}
           selectedSpotId={selectedSpotId}
           selectedPin={selectedPin}
-          isOpen={drawerOpen}
+          view={panelView}
+          isOpen={panelOpen}
           onSelectSpot={(spotId) => {
             const pin = pins.find((p) => p.id === spotId)
-            if (pin) selectPin(pin)
+            if (pin) openInLocationsPanel(pin)
           }}
-          onClose={() => setDrawerOpen(false)}
+          onBackToList={handleBackToList}
+          onClose={() => setPanelOpen(false)}
         />
 
-        <section className="main-column">
+        <section className="main-column main-column--map-only">
           <div className="map-zone">
             <p className="map-zone__hint">
-              Click the map to add a location anywhere, or select a marker for NOAA + Windy detail.
+              Click the map to add a location, or select a marker for a quick NOAA and Windy view.
             </p>
             <LakeMap
               pins={pins}
               selectedSpotId={selectedSpotId}
+              popupDismissSignal={popupDismissSignal}
               pendingLocation={pendingLocation}
               newSpotName={newSpotName}
               editingSpotId={editingSpotId}
@@ -212,8 +219,8 @@ function Home() {
               editLat={editLat}
               editLng={editLng}
               onMapClick={handleMapClick}
-              onSelectSpot={selectPin}
-              onOpenDetail={handleOpenDetail}
+              onMarkerClick={handleMarkerClick}
+              onOpenDetail={openInLocationsPanel}
               onNewSpotNameChange={setNewSpotName}
               onAddSpot={handleAddSpot}
               onCancelAdd={() => setPendingLocation(null)}
@@ -225,24 +232,6 @@ function Home() {
               onSaveEdit={handleSaveEdit}
               onCancelEdit={() => setEditingSpotId(null)}
             />
-          </div>
-
-          <div className="bottom-panel" ref={bottomPanelRef}>
-            {detailPin ? (
-              <LocationDetailPanel
-                pin={detailPin}
-                justOpened={detailJustOpened}
-                onClose={() => setDetailPin(null)}
-              />
-            ) : (
-              <div className="bottom-panel__placeholder">
-                <p className="bottom-panel__label">Spot detail</p>
-                <p>
-                  Select a location on the map or in the drawer to load NOAA buoy readings and
-                  Windy forecast below.
-                </p>
-              </div>
-            )}
           </div>
         </section>
       </div>

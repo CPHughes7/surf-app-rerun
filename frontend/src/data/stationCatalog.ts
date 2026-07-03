@@ -1,5 +1,13 @@
 export type StationKind = 'cman' | 'lighthouse' | 'pier' | 'buoy'
 
+/**
+ * Static NOAA station allowlist for nearest-station lookup.
+ * Locations come from the backend API; station assignment is derived at read time.
+ *
+ * Future scale options (not implemented): optional windStationId/waveBuoyId on
+ * backend locations, or an admin-managed station config file.
+ */
+
 export type Station = {
   id: string
   name: string
@@ -32,7 +40,7 @@ export const WAVE_CAPABLE_OFFSHORE_BUOYS: Station[] = [
   { id: '45214', name: 'South Entry Light', lat: 42.674, lng: -87.026, kind: 'lighthouse', hasWind: false, hasWaves: true },
 ]
 
-export const MAX_WAVE_REFERENCE_KM = 80
+export const MAX_WAVE_REFERENCE_KM = 100
 export const MAX_NEARSHORE_WIND_KM = 50
 
 const ALL_STATIONS: Station[] = [...NEARSHORE_STATIONS, ...WAVE_CAPABLE_OFFSHORE_BUOYS]

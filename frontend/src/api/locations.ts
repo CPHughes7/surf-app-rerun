@@ -1,4 +1,4 @@
-import { SURF_SPOTS } from '../data/surfSpots'
+import { enrichLocationPin } from '../data/catalogMatch'
 import type { LocationPin } from '../types/location'
 import type { SurfSpot } from '../data/surfSpots'
 
@@ -17,15 +17,6 @@ export type LocationInput = {
   longitude: number
 }
 
-function matchCatalogSpot(dto: LocationDto) {
-  return SURF_SPOTS.find(
-    (spot) =>
-      spot.name === dto.name ||
-      (Math.abs(spot.lat - dto.latitude) < 0.02 &&
-        Math.abs(spot.lng - dto.longitude) < 0.02),
-  )
-}
-
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, init)
   if (!response.ok) {
@@ -35,38 +26,11 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export function locationDtoToPin(dto: LocationDto): LocationPin {
-  const catalog = matchCatalogSpot(dto)
-  const id = String(dto.id)
-
-  if (catalog) {
-    return {
-      id,
-      spotId: id,
-      name: dto.name,
-      lat: dto.latitude,
-      lng: dto.longitude,
-      region: catalog.region,
-      windStationId: catalog.windStationId,
-      waveReferenceBuoyId: catalog.waveReferenceBuoyId,
-      createdAt: new Date().toISOString(),
-    }
-  }
-
-  return {
-    id,
-    spotId: id,
-    name: dto.name,
-    lat: dto.latitude,
-    lng: dto.longitude,
-    region: 'Custom',
-    windStationId: '',
-    waveReferenceBuoyId: '',
-    createdAt: new Date().toISOString(),
-  }
+  return enrichLocationPin(dto)
 }
 
 export function locationDtoToSurfSpot(dto: LocationDto): SurfSpot {
-  const pin = locationDtoToPin(dto)
+  const pin = enrichLocationPin(dto)
   return {
     id: pin.spotId,
     name: pin.name,

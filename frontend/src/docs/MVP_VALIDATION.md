@@ -2,6 +2,8 @@
 
 This document records expected behavior for the dual-source NOAA data layer on Lake Michigan catalog spots.
 
+For the end-to-end pipeline narrative (fetch → parse → resolve → score), see [NDBC_PIPELINE.md](./NDBC_PIPELINE.md).
+
 ## Data model
 
 - **Wind (nearshore):** C-MAN / lighthouse / pier stations (`CHII2`, `MCYI3`, `SVNM4`, `MKGM4`, `MLWW3`, `SGNW3`, `45186`)
