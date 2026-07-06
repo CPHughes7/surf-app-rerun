@@ -10,7 +10,7 @@ export default function Test() {
         .then((word) => setStr(word["string"].toString()))
     }, [])
     return (
-        <h1> Test </h1>
+        <h1> {str} </h1>
     )
     ;
 }

@@ -1,5 +1,8 @@
 
 from fastapi import FastAPI, Depends
+from fastapi.responses import FileResponse
+from fastapi.routing import request_response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, create_engine, select
@@ -17,6 +20,7 @@ app.add_middleware(
 
 BASE_DIR = Path(__file__).resolve().parent
 DB =  BASE_DIR / "database.db"
+FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
 
 engine = create_engine(f"sqlite:///{DB}", echo=True)
 
@@ -74,3 +78,17 @@ def update_location(location_id: int, data: Location, session: Session = Depends
     session.commit()
     session.refresh(location)
     return location
+
+if FRONTEND_DIST.exists():
+    app.mount(
+        "/assets",
+        StaticFiles(directory=FRONTEND_DIST / "assets"),
+        name="assets",
+    )
+
+    @app.get("/{path:path}")
+    def serve_frontend(path: str):
+        requested_file = FRONTEND_DIST / path 
+        if path and requested_file.is_file():
+            return FileResponse(requested_file)
+        return FileResponse(FRONTEND_DIST / "index.html")

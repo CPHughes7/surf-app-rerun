@@ -10,11 +10,19 @@ export default defineConfig({
   ],
   server: {
     proxy: {
+      // Must come before the generic '/api' rule below, since Vite matches
+      // proxy contexts in insertion order and this path needs NOAA, not the backend.
       '/api/ndbc/latest_obs.txt': {
         target: 'https://www.ndbc.noaa.gov',
         changeOrigin: true,
         rewrite: () => '/data/latest_obs/latest_obs.txt',
       },
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 })
+

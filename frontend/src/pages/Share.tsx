@@ -6,7 +6,6 @@ import markerIcon from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import { MapContainer, Marker, Popup, TileLayer, useMapEvents } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { data } from "react-router-dom";
 
 const surfSpotIcon = L.icon({
   iconAnchor: [12, 41],
@@ -57,14 +56,14 @@ export default function Share() {
 //     { id: 3, name: "South Shore Beach", latitude: 42.9993, longitude: -87.8832 },
 // ]; 
   useEffect (() =>  {
-    fetch("http://localhost:8000/api/locations")
+    fetch("/api/locations")
     .then((res) => res.json())
     .then((data) => setSpots(data))
 
   }, [refresh]);
 
-  function addLocation(name, latitude, longitude) {
-    fetch("http://localhost:8000/api/location", {
+  function addLocation(name: string, latitude: number, longitude: number) {
+    fetch("/api/location", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({name, latitude, longitude}),
@@ -84,7 +83,9 @@ export default function Share() {
     setSpots((currentSpots) => [
       ...currentSpots,
       {
-        id: null,
+        // Temporary negative id until the backend responds and a refetch
+        // replaces this optimistic entry with the real record.
+        id: -Date.now(),
         name: newSpotName.trim(),
         latitude: pendingLocation[0],
         longitude: pendingLocation[1],
@@ -96,8 +97,8 @@ export default function Share() {
     setNewSpotName("");
     setPendingLocation(null);
   }
-  function deleteLocation(location_id) {
-    fetch(`http://localhost:8000/api/locations/${location_id}`, {
+  function deleteLocation(location_id: number) {
+    fetch(`/api/locations/${location_id}`, {
         method: "DELETE",
      })
      .then((res) => res.json())
@@ -117,7 +118,7 @@ export default function Share() {
         event.preventDefault();
         event.stopPropagation();
 
-        fetch(`http://localhost:8000/api/locations/${location_id}`, {
+        fetch(`/api/locations/${location_id}`, {
             method: "PUT",
             headers: {"Content-Type": "application/json"},
             body: JSON.stringify({ name: newSpotName}),
@@ -133,7 +134,7 @@ export default function Share() {
         setIsEditing(!isEditing)
     }
 
-    function handleIsEditingToggle(event: any, spot_name) {
+    function handleIsEditingToggle(event: any, spot_name: string) {
         event.preventDefault();
         event.stopPropagation();
         setIsEditing(!isEditing)
