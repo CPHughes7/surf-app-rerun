@@ -49,7 +49,8 @@ export default function Share() {
   const [spots, setSpots] = useState<SurfSpot[]>([]);
   const [newSpotName, setNewSpotName] = useState("");
   const [pendingLocation, setPendingLocation] = useState<LatLngTuple | null>(null);
-
+  const [refresh, setRefresh] = useState(false)
+  const [isEditing, setIsEditing] = useState(false);
 //   const initialSurfSpots: SurfSpot[] = [
 //     { id: 1, name: "Bradford Beach", latitude: 43.0634, longitude: -87.8724 },
 //     { id: 2, name: "McKinley Beach", latitude: 43.0509, longitude: -87.8833 },
@@ -60,7 +61,7 @@ export default function Share() {
     .then((res) => res.json())
     .then((data) => setSpots(data))
 
-  }, []);
+  }, [refresh]);
 
   function addLocation(name, latitude, longitude) {
     fetch("http://localhost:8000/api/location", {
@@ -69,6 +70,7 @@ export default function Share() {
         body: JSON.stringify({name, latitude, longitude}),
      })
      .then((res) => res.json())
+     .then( () => setRefresh(!refresh))
     
     }
 
@@ -82,7 +84,7 @@ export default function Share() {
     setSpots((currentSpots) => [
       ...currentSpots,
       {
-        id: Date.now(),
+        id: null,
         name: newSpotName.trim(),
         latitude: pendingLocation[0],
         longitude: pendingLocation[1],
@@ -94,6 +96,55 @@ export default function Share() {
     setNewSpotName("");
     setPendingLocation(null);
   }
+  function deleteLocation(location_id) {
+    fetch(`http://localhost:8000/api/locations/${location_id}`, {
+        method: "DELETE",
+     })
+     .then((res) => res.json())
+     .then( () => setRefresh(!refresh))
+    
+    }
+
+  function handleDeleteSpot(event: React.MouseEvent<HTMLButtonElement, MouseEvent>, spot_id: number) {
+    event.preventDefault();
+    deleteLocation(spot_id)
+
+  
+  }
+    
+    
+    function handleUpdateLocation(event: any, location_id: number ) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        fetch(`http://localhost:8000/api/locations/${location_id}`, {
+            method: "PUT",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ name: newSpotName}),
+         })
+         .then((res) => res.json())
+         .then( () => {
+            setRefresh(!refresh);
+            setIsEditing(false);
+          }
+         )
+         
+
+        setIsEditing(!isEditing)
+    }
+
+    function handleIsEditingToggle(event: any, spot_name) {
+        event.preventDefault();
+        event.stopPropagation();
+        setIsEditing(!isEditing)
+
+
+
+        if (isEditing) {
+            setNewSpotName(spot_name)
+        }
+    }
+
 
   return (
     <div
@@ -116,7 +167,28 @@ export default function Share() {
         <MapClickHandler onMapClick={setPendingLocation} />
         {spots.map((spot) => (
           <Marker key={spot.id} icon={surfSpotIcon} position={[spot.latitude, spot.longitude]}>
-            <Popup>{spot.name}</Popup>
+            <Popup>
+                {isEditing ? (
+                    <>
+                        <input
+                            autoFocus
+                            value={newSpotName}
+                            onChange={(event) => setNewSpotName(event.target.value)}
+                            style={{ display: "block", margin: "8px 0", width: "160px" }}
+                        />
+                        <button onClick={(e) => {handleIsEditingToggle(e, spot.name)}}>Cancel</button>
+                        <button onClick={(e) => {handleUpdateLocation(e, spot.id)}}>Update</button>
+                    </>
+                ) : (
+
+                    <>
+                        {spot.name}{( spot.id ? spot.id : " no id" )} 
+                        <button onClick={(e) => handleDeleteSpot(e, spot.id )}>Delete</button>
+                        <button onClick={(e) => {handleIsEditingToggle(e, spot.name)}}>Edit</button>
+                    </>
+                )}
+
+            </Popup>
           </Marker>
         ))}
         {pendingLocation && (

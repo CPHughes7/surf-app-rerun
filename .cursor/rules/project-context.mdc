@@ -1,0 +1,57 @@
+---
+description: Project goals, branching strategy, and agent development approach for surf-app-rerun
+alwaysApply: true
+---
+
+# surf-app-rerun — Project Context
+
+## What we're building
+
+Lake Michigan surf conditions app: Leaflet map with curated catalog spots, live NOAA NDBC buoy data (wind + waves), surfability scoring, and Windy forecast embed.
+
+Core workflow: open map → select a catalog spot → review NOAA readings and surfability → view Windy forecast.
+
+## Branching strategy
+
+We maintain three parallel tracks:
+
+| Branch | Purpose |
+|--------|---------|
+| `learn/v1` | **Frozen** learning snapshot (tag: `learn-v1-snapshot`). Reference only — do not commit feature work here. |
+| `dev/rebuild` | **Active** development. Fast iteration and agent-driven regeneration welcome. |
+| `main` | Production deploy target (S3 via GitHub Actions). Merge from `dev/rebuild` only when ready to ship. |
+
+**Default working branch:** `dev/rebuild`
+
+On `dev/rebuild`, agents should move quickly — large refactors, rewrites, and experiments are expected. Do not preserve incremental learning history from `learn/v1`. Use `learn/v1` only to diff, reference patterns, or cherry-pick.
+
+## In scope
+
+- Leaflet + OSM map with ~13 Lake Michigan catalog spots
+- Catalog-only spot selection with map snap gating (~15 km)
+- Live NOAA fetch: nearshore wind (C-MAN/pier) + offshore wave buoys (allowlist only)
+- Explainable surfability scoring with confidence badges
+- Windy embed for forecast context
+- Frontend-first architecture (`frontend/`); backend is minimal
+
+## Out of scope (for now)
+
+- GIS shoreline-buffer auto gating
+- Windy Point Forecast API (embed only)
+- Production NOAA proxy (`VITE_NDBC_URL` not wired; dev uses Vite proxy)
+- Authentication
+
+## Data rules
+
+- **Wind:** nearshore stations (`CHII2`, `MCYI3`, `SVNM4`, etc.)
+- **Waves:** offshore buoy allowlist only (`45168`, `45029`, `45024`, etc.) — never read WVHT from nearshore stations
+- Spots succeed when wind OR wave data is available
+
+See `frontend/src/docs/MVP_VALIDATION.md` for validation steps.
+
+## Code conventions
+
+- Match existing patterns in the surrounding file before introducing new abstractions
+- Keep changes focused; avoid unrelated refactors
+- Run `cd frontend && npm run dev` for local development
+- Do not commit to `learn/v1`; do not push to `main` unless explicitly promoting to production
