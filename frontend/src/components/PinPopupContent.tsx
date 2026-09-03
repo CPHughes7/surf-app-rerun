@@ -1,16 +1,15 @@
-import { useBuoyData } from '../hooks/useBuoyData'
+import type { BuoyDataState } from '../hooks/useBuoyData'
 import type { LocationPin } from '../types/location'
 import { formatCoords, windyEmbedUrl } from '../types/location'
 import NoaaReadings from './NoaaReadings'
 
 type PinPopupContentProps = {
   pin: LocationPin
+  buoyData: BuoyDataState
   onOpen: () => void
 }
 
-function PinPopupContent({ pin, onOpen }: PinPopupContentProps) {
-  const buoyData = useBuoyData(pin)
-
+function PinPopupContent({ pin, buoyData, onOpen }: PinPopupContentProps) {
   return (
     <div className="pin-popup">
       <h3 className="pin-popup__title">{pin.name}</h3>
@@ -33,7 +32,7 @@ function PinPopupContent({ pin, onOpen }: PinPopupContentProps) {
       </section>
 
       <button type="button" className="btn btn--primary pin-popup__open" onClick={onOpen}>
-        View in Locations
+        View full detail
       </button>
     </div>
   )

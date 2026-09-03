@@ -1,159 +1,77 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
-import {
-  createLocation,
-  deleteLocation,
-  getLocations,
-  locationDtoToPin,
-  updateLocation,
-} from '../api/locations'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import LakeMap from '../components/LakeMap'
-import LocationsPanel, { type LocationsPanelView } from '../components/LocationsPanel'
+import LocationDetailPanel from '../components/LocationDetailPanel'
+import LocationsPanel from '../components/LocationsPanel'
+import { SURF_SPOTS, getSpotById } from '../data/surfSpots'
+import { snapToNearestSpot } from '../lib/geo/snapToSpot'
+import { buoyDataForSpot, useCatalogConditions } from '../hooks/useCatalogConditions'
 import type { LocationPin } from '../types/location'
+import { spotToPin } from '../types/location'
 
 function Home() {
-  const [pins, setPins] = useState<LocationPin[]>([])
+  const catalog = useCatalogConditions()
+  const pins = useMemo(() => SURF_SPOTS.map(spotToPin), [])
+
   const [selectedSpotId, setSelectedSpotId] = useState<string | null>(null)
-  const [panelOpen, setPanelOpen] = useState(true)
-  const [panelView, setPanelView] = useState<LocationsPanelView>('list')
-  const [popupDismissSignal, setPopupDismissSignal] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [actionError, setActionError] = useState<string | null>(null)
-  const [pendingLocation, setPendingLocation] = useState<[number, number] | null>(null)
-  const [newSpotName, setNewSpotName] = useState('')
-  const [editingSpotId, setEditingSpotId] = useState<string | null>(null)
-  const [editName, setEditName] = useState('')
-  const [editLat, setEditLat] = useState('')
-  const [editLng, setEditLng] = useState('')
-
-  useEffect(() => {
-    let active = true
-
-    async function loadLocations() {
-      try {
-        setLoading(true)
-        setError(null)
-        const locations = await getLocations()
-        if (!active) return
-        setPins(locations.map(locationDtoToPin))
-      } catch (err) {
-        if (!active) return
-        setError(err instanceof Error ? err.message : 'Unable to load locations.')
-      } finally {
-        if (active) setLoading(false)
-      }
-    }
-
-    void loadLocations()
-    return () => {
-      active = false
-    }
-  }, [])
-
-  const selectedPin = useMemo(
-    () => pins.find((pin) => pin.id === selectedSpotId) ?? null,
-    [pins, selectedSpotId],
+  const [detailPin, setDetailPin] = useState<LocationPin | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(
+    () => typeof window === 'undefined' || window.matchMedia('(min-width: 901px)').matches,
   )
+  const [popupDismissSignal, setPopupDismissSignal] = useState(0)
+  const [mapMessage, setMapMessage] = useState<string | null>(null)
+  const messageTimerRef = useRef<number | null>(null)
 
-  const handleMarkerClick = useCallback((pin: LocationPin) => {
-    setSelectedSpotId(pin.id)
-    setPanelOpen(false)
+  const showMapMessage = useCallback((message: string) => {
+    setMapMessage(message)
+    if (messageTimerRef.current) window.clearTimeout(messageTimerRef.current)
+    messageTimerRef.current = window.setTimeout(() => setMapMessage(null), 4000)
   }, [])
 
-  const openInLocationsPanel = useCallback((pin: LocationPin) => {
-    setSelectedSpotId(pin.id)
-    setPanelOpen(true)
-    setPanelView('detail')
+  const selectSpot = useCallback((spotId: string) => {
+    const spot = getSpotById(spotId)
+    if (!spot) return
+    setSelectedSpotId(spot.id)
+  }, [])
+
+  const openDetail = useCallback((pin: LocationPin) => {
+    setSelectedSpotId(pin.spotId)
+    setDetailPin(pin)
     setPopupDismissSignal((signal) => signal + 1)
   }, [])
 
-  const handleBackToList = useCallback(() => {
-    setSelectedSpotId(null)
-    setPanelView('list')
-  }, [])
-
-  const handleMapClick = useCallback((lat: number, lng: number) => {
-    setPendingLocation([lat, lng])
-    setNewSpotName('')
-    setPanelOpen(false)
-  }, [])
-
-  const handleAddSpot = useCallback(
-    async (event: FormEvent<HTMLFormElement>) => {
-      event.preventDefault()
-      if (!pendingLocation || newSpotName.trim() === '') return
-
-      try {
-        setActionError(null)
-        const created = await createLocation({
-          name: newSpotName.trim(),
-          latitude: pendingLocation[0],
-          longitude: pendingLocation[1],
-        })
-        const pin = locationDtoToPin(created)
-        setPins((current) => [...current, pin])
-        openInLocationsPanel(pin)
-        setNewSpotName('')
-        setPendingLocation(null)
-      } catch (err) {
-        setActionError(err instanceof Error ? err.message : 'Unable to create location.')
+  const handleMapClick = useCallback(
+    (lat: number, lng: number) => {
+      const result = snapToNearestSpot(lat, lng)
+      if (result.ok) {
+        const pin = spotToPin(result.spot)
+        openDetail(pin)
+        showMapMessage(`Snapped to ${result.spot.name}`)
+      } else if (result.nearestSpot && result.nearestDistanceM !== null) {
+        const km = (result.nearestDistanceM / 1000).toFixed(1)
+        showMapMessage(
+          `Outside surf spots. Nearest is ${result.nearestSpot.name} (${km} km away). Pick from the catalog.`,
+        )
+      } else {
+        showMapMessage('Click closer to a catalog surf spot.')
       }
     },
-    [newSpotName, pendingLocation, openInLocationsPanel],
+    [openDetail, showMapMessage],
   )
 
-  const handleEdit = useCallback((pin: LocationPin) => {
-    setEditingSpotId(pin.id)
-    setEditName(pin.name)
-    setEditLat(String(pin.lat))
-    setEditLng(String(pin.lng))
-  }, [])
-
-  const handleSaveEdit = useCallback(
-    async (event: FormEvent<HTMLFormElement>, pinId: string) => {
-      event.preventDefault()
-      const lat = Number(editLat)
-      const lng = Number(editLng)
-      if (editName.trim() === '' || Number.isNaN(lat) || Number.isNaN(lng)) return
-
-      try {
-        const id = Number(pinId)
-        if (Number.isNaN(id)) throw new Error(`Invalid location id: ${pinId}`)
-        setActionError(null)
-        const updated = await updateLocation(id, {
-          name: editName.trim(),
-          latitude: lat,
-          longitude: lng,
-        })
-        const pin = locationDtoToPin(updated)
-        setPins((current) => current.map((p) => (p.id === pinId ? pin : p)))
-        setEditingSpotId(null)
-      } catch (err) {
-        setActionError(err instanceof Error ? err.message : 'Unable to update location.')
-      }
+  const handleSelectSpotFromDrawer = useCallback(
+    (spotId: string) => {
+      const spot = getSpotById(spotId)
+      if (!spot) return
+      openDetail(spotToPin(spot))
     },
-    [editLat, editLng, editName],
+    [openDetail],
   )
 
-  const handleDelete = useCallback(
-    async (pinId: string) => {
-      try {
-        const id = Number(pinId)
-        if (Number.isNaN(id)) throw new Error(`Invalid location id: ${pinId}`)
-        setActionError(null)
-        await deleteLocation(id)
-        setPins((current) => current.filter((pin) => pin.id !== pinId))
-        if (selectedSpotId === pinId) {
-          setSelectedSpotId(null)
-          setPanelView('list')
-        }
-        setEditingSpotId(null)
-      } catch (err) {
-        setActionError(err instanceof Error ? err.message : 'Unable to delete location.')
-      }
-    },
-    [selectedSpotId],
-  )
+  const handleMarkerClick = useCallback((pin: LocationPin) => {
+    selectSpot(pin.spotId)
+  }, [selectSpot])
+
+  const handleCloseDrawer = useCallback(() => setDrawerOpen(false), [])
 
   return (
     <div className="app-shell">
@@ -163,76 +81,77 @@ function Home() {
             type="button"
             className="btn btn--ghost drawer-toggle"
             onClick={() => {
-              setPanelOpen((open) => {
+              setDrawerOpen((open) => {
                 const next = !open
                 if (next) setPopupDismissSignal((signal) => signal + 1)
                 return next
               })
             }}
-            aria-expanded={panelOpen}
-            aria-controls="locations-panel"
+            aria-expanded={drawerOpen}
+            aria-controls="spots-drawer"
           >
-            {panelOpen ? 'Hide Locations' : 'Locations'}
+            {drawerOpen ? 'Hide spots' : 'Spots'}
           </button>
         </div>
         <div className="app-header__center">
           <h1>Lake Surf</h1>
-          <p className="app-header__tagline">
-            Manage locations and review NOAA readings with Windy forecast.
-          </p>
+          <p className="app-header__tagline">Live NOAA conditions for Lake Michigan breaks</p>
         </div>
         <div className="app-header__side app-header__side--right" aria-hidden="true" />
       </header>
 
-      {loading && <p role="status">Loading locations…</p>}
-      {error && <p role="alert">Could not load locations: {error}</p>}
-      {actionError && <p role="alert">Location action failed: {actionError}</p>}
-
       <div className="app-body">
+        {drawerOpen && (
+          <button
+            type="button"
+            className="drawer-backdrop"
+            aria-label="Close spots list"
+            onClick={handleCloseDrawer}
+          />
+        )}
+
         <LocationsPanel
           pins={pins}
           selectedSpotId={selectedSpotId}
-          selectedPin={selectedPin}
-          view={panelView}
-          isOpen={panelOpen}
-          onSelectSpot={(spotId) => {
-            const pin = pins.find((p) => p.id === spotId)
-            if (pin) openInLocationsPanel(pin)
-          }}
-          onBackToList={handleBackToList}
-          onClose={() => setPanelOpen(false)}
+          catalog={catalog}
+          isOpen={drawerOpen}
+          onSelectSpot={handleSelectSpotFromDrawer}
+          onClose={handleCloseDrawer}
         />
 
-        <section className="main-column main-column--map-only">
+        <section className="main-column">
           <div className="map-zone">
             <p className="map-zone__hint">
-              Click the map to add a location, or select a marker for a quick NOAA and Windy view.
+              Click a marker, pick a catalog spot, or snap-click within ~15 km of a break
             </p>
+            {mapMessage && (
+              <p className="map-zone__message" role="status">
+                {mapMessage}
+              </p>
+            )}
+            {catalog.error && (
+              <p className="map-zone__message map-zone__message--error" role="alert">
+                Could not load NOAA data: {catalog.error}
+              </p>
+            )}
             <LakeMap
               pins={pins}
               selectedSpotId={selectedSpotId}
               popupDismissSignal={popupDismissSignal}
-              pendingLocation={pendingLocation}
-              newSpotName={newSpotName}
-              editingSpotId={editingSpotId}
-              editName={editName}
-              editLat={editLat}
-              editLng={editLng}
+              catalog={catalog}
               onMapClick={handleMapClick}
               onMarkerClick={handleMarkerClick}
-              onOpenDetail={openInLocationsPanel}
-              onNewSpotNameChange={setNewSpotName}
-              onAddSpot={handleAddSpot}
-              onCancelAdd={() => setPendingLocation(null)}
-              onEdit={handleEdit}
-              onDelete={(pinId) => void handleDelete(pinId)}
-              onEditNameChange={setEditName}
-              onEditLatChange={setEditLat}
-              onEditLngChange={setEditLng}
-              onSaveEdit={handleSaveEdit}
-              onCancelEdit={() => setEditingSpotId(null)}
+              onOpenDetail={openDetail}
             />
           </div>
+
+          {detailPin && (
+            <LocationDetailPanel
+              pin={detailPin}
+              buoyData={buoyDataForSpot(catalog, detailPin.spotId)}
+              onClose={() => setDetailPin(null)}
+            />
+          )}
         </section>
       </div>
     </div>

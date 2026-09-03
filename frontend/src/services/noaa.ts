@@ -287,13 +287,32 @@ function buildInferenceNote(wind: WindObservation | null, wave: WaveObservation 
   return parts.join('. ') + (parts.length ? '.' : '')
 }
 
+const OBS_CACHE_MS = 60_000
+let obsCache: { at: number; data: Map<string, RawNdbcObservation> } | null = null
+let obsInFlight: Promise<Map<string, RawNdbcObservation>> | null = null
+
 export async function fetchNdbcLatestObs(): Promise<Map<string, RawNdbcObservation>> {
-  const response = await fetch(NDBC_LATEST_URL)
-  if (!response.ok) {
-    throw new Error(`NDBC fetch failed: ${response.status}`)
+  if (obsCache && Date.now() - obsCache.at < OBS_CACHE_MS) {
+    return obsCache.data
   }
-  const text = await response.text()
-  return parseNdbcLatestObs(text)
+  if (obsInFlight) return obsInFlight
+
+  obsInFlight = (async () => {
+    const response = await fetch(NDBC_LATEST_URL)
+    if (!response.ok) {
+      throw new Error(`NDBC fetch failed: ${response.status}`)
+    }
+    const text = await response.text()
+    const data = parseNdbcLatestObs(text)
+    obsCache = { at: Date.now(), data }
+    return data
+  })()
+
+  try {
+    return await obsInFlight
+  } finally {
+    obsInFlight = null
+  }
 }
 
 export function spotConditionsFromObservations(

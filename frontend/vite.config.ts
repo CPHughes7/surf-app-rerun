@@ -15,10 +15,6 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: () => '/data/latest_obs/latest_obs.txt',
       },
-      '/api': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-      },
     },
   },
 })
