@@ -85,61 +85,65 @@ def notify_me(payload: NotifyMeInput):
     return {"ok": True}
 
 
-class SubscribeInput(BaseModel):
-    email: str
+def require_admin_secret(x_admin_secret: str | None = Header(default=None)) -> None:
+    expected = os.environ.get("ADMIN_SECRET", "")
+    # Fail closed: an unset secret must never match an absent/empty header.
+    if not expected or x_admin_secret != expected:
+        raise HTTPException(status_code=401, detail="Invalid admin secret")
 
 
-@app.post("/api/subscribe")
-def subscribe(payload: SubscribeInput):
-    """Issue a bearer token gating hidden-spot reads.
+class PrivateSpotInput(BaseModel):
+    name: str
+    lat: float
+    lng: float
+    facingDeg: float
 
-    Payment is stubbed — the token is granted immediately — but the
-    token is genuinely required: there is no other way to read
-    /api/hidden-spots. Idempotent per email (same email -> same token).
+
+@app.post("/api/private-spots")
+def create_private_spot(payload: PrivateSpotInput, _: None = Depends(require_admin_secret)):
+    """Create a private spot at an arbitrary coordinate.
+
+    The paid capability is this: point at any coordinate and get a
+    verdict there, fused client-side from the same NOAA seam that
+    powers catalog spots (see frontend/src/lib/conditions/). This
+    endpoint is only the gated persistence boundary — admin-only for
+    now, real auth/billing later without moving where the boundary
+    sits.
     """
-    email = payload.email.strip().lower()
-    if not email or not EMAIL_RE.match(email):
-        raise HTTPException(status_code=422, detail="Enter a valid email address")
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Name is required")
+    if not (-90 <= payload.lat <= 90) or not (-180 <= payload.lng <= 180):
+        raise HTTPException(status_code=422, detail="Invalid coordinates")
+    facing_deg = payload.facingDeg % 360
+
+    spot_id = uuid.uuid4().hex
+    created_at = datetime.now(timezone.utc).isoformat()
 
     with db.get_connection() as conn:
-        existing = conn.execute(
-            "SELECT token FROM subscriber_tokens WHERE email = ? ORDER BY created_at ASC LIMIT 1",
-            (email,),
-        ).fetchone()
-        if existing:
-            return {"token": existing["token"], "email": email}
-
-        token = uuid.uuid4().hex
-        created_at = datetime.now(timezone.utc).isoformat()
         conn.execute(
-            "INSERT INTO subscriber_tokens (token, email, created_at) VALUES (?, ?, ?)",
-            (token, email, created_at),
+            """
+            INSERT INTO private_spots (id, name, lat, lng, facing_deg, created_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (spot_id, name, payload.lat, payload.lng, facing_deg, created_at),
         )
 
-    return {"token": token, "email": email}
+    return {
+        "id": spot_id,
+        "name": name,
+        "lat": payload.lat,
+        "lng": payload.lng,
+        "facingDeg": facing_deg,
+        "createdAt": created_at,
+    }
 
 
-def require_subscriber_token(authorization: str | None = Header(default=None)) -> str:
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing bearer token")
-
-    token = authorization.removeprefix("Bearer ").strip()
-    with db.get_connection() as conn:
-        row = conn.execute(
-            "SELECT token FROM subscriber_tokens WHERE token = ?", (token,)
-        ).fetchone()
-
-    if not row:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    return token
-
-
-@app.get("/api/hidden-spots")
-def get_hidden_spots(_: str = Depends(require_subscriber_token)):
+@app.get("/api/private-spots")
+def list_private_spots(_: None = Depends(require_admin_secret)):
     with db.get_connection() as conn:
         rows = conn.execute(
-            "SELECT id, name, lat, lng, region, is_firing, firing_at FROM hidden_spots"
+            "SELECT id, name, lat, lng, facing_deg, created_at FROM private_spots ORDER BY created_at DESC"
         ).fetchall()
 
     return [
@@ -148,46 +152,11 @@ def get_hidden_spots(_: str = Depends(require_subscriber_token)):
             "name": row["name"],
             "lat": row["lat"],
             "lng": row["lng"],
-            "region": row["region"],
-            "isFiring": bool(row["is_firing"]),
-            "firingAt": row["firing_at"],
+            "facingDeg": row["facing_deg"],
+            "createdAt": row["created_at"],
         }
         for row in rows
     ]
-
-
-def require_operator_secret(x_operator_secret: str | None = Header(default=None)) -> None:
-    expected = os.environ.get("OPERATOR_SECRET", "")
-    # Fail closed: an unset secret must never match an absent/empty header.
-    if not expected or x_operator_secret != expected:
-        raise HTTPException(status_code=401, detail="Invalid operator secret")
-
-
-@app.post("/api/operator/hidden-spots/{spot_id}/fire")
-def fire_hidden_spot(spot_id: str, _: None = Depends(require_operator_secret)):
-    now = datetime.now(timezone.utc).isoformat()
-    with db.get_connection() as conn:
-        cursor = conn.execute(
-            "UPDATE hidden_spots SET is_firing = 1, firing_at = ? WHERE id = ?",
-            (now, spot_id),
-        )
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Unknown hidden spot")
-
-    return {"ok": True}
-
-
-@app.post("/api/operator/hidden-spots/{spot_id}/clear")
-def clear_hidden_spot(spot_id: str, _: None = Depends(require_operator_secret)):
-    with db.get_connection() as conn:
-        cursor = conn.execute(
-            "UPDATE hidden_spots SET is_firing = 0, firing_at = NULL WHERE id = ?",
-            (spot_id,),
-        )
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=404, detail="Unknown hidden spot")
-
-    return {"ok": True}
 
 
 class LocationInput(BaseModel):

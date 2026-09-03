@@ -2,7 +2,6 @@ import type { CatalogConditionsState } from '../hooks/useCatalogConditions'
 import { buoyDataForSpot } from '../hooks/useCatalogConditions'
 import type { LocationPin } from '../types/location'
 import { formatCoords } from '../types/location'
-import HiddenSpotsPanel from './HiddenSpotsPanel'
 import SurfabilityBadge from './SurfabilityBadge'
 
 type LocationsPanelProps = {
@@ -84,8 +83,6 @@ function LocationsPanel({
           </div>
         ))}
       </nav>
-
-      <HiddenSpotsPanel />
     </aside>
   )
 }
