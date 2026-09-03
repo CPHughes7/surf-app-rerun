@@ -5,9 +5,10 @@ import SurfabilityBadge from './SurfabilityBadge'
 type NoaaReadingsProps = {
   buoyData: BuoyDataState
   variant?: 'popup' | 'detail'
+  showVerdict?: boolean
 }
 
-function NoaaReadings({ buoyData, variant = 'popup' }: NoaaReadingsProps) {
+function NoaaReadings({ buoyData, variant = 'popup', showVerdict = true }: NoaaReadingsProps) {
   const { conditions, surfability, loading, error } = buoyData
   const gridClass =
     variant === 'detail' ? 'bottom-detail__grid' : 'pin-popup__readings'
@@ -25,11 +26,11 @@ function NoaaReadings({ buoyData, variant = 'popup' }: NoaaReadingsProps) {
 
   return (
     <>
-      <SurfabilityBadge surfability={surfability} compact={variant === 'popup'} />
+      {showVerdict && <SurfabilityBadge surfability={surfability} compact={variant === 'popup'} />}
       {variant === 'detail' && conditions?.inferenceNote && (
         <p className="noaa-readings__inference">{conditions.inferenceNote}</p>
       )}
-      {variant === 'detail' && (
+      {variant === 'detail' && showVerdict && (
         <p className="surfability-block__summary surfability-block__summary--detail">
           {surfability.summary}
         </p>

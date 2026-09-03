@@ -1,4 +1,5 @@
 import type { BuoyDataState } from '../hooks/useBuoyData'
+import type { SurfabilityFlag } from '../types/conditions'
 import type { LocationPin } from '../types/location'
 import { formatCoords, windyEmbedUrl } from '../types/location'
 import NoaaReadings from './NoaaReadings'
@@ -9,7 +10,24 @@ type LocationDetailPanelProps = {
   onClose: () => void
 }
 
+type VerdictTone = 'go' | 'marginal' | 'no' | 'unknown'
+
+const VERDICT_BY_FLAG: Record<SurfabilityFlag, { headline: string; tone: VerdictTone }> = {
+  good: { headline: 'Go', tone: 'go' },
+  marginal: { headline: 'Marginal', tone: 'marginal' },
+  windOnly: { headline: 'Marginal', tone: 'marginal' },
+  staleData: { headline: 'Marginal', tone: 'marginal' },
+  tooSmall: { headline: 'Not today', tone: 'no' },
+  tooWindy: { headline: 'Not today', tone: 'no' },
+  missingData: { headline: 'No verdict yet', tone: 'unknown' },
+}
+
 function LocationDetailPanel({ pin, buoyData, onClose }: LocationDetailPanelProps) {
+  const { surfability, loading } = buoyData
+  const verdict = loading
+    ? { headline: 'Checking conditions…', tone: 'unknown' as VerdictTone }
+    : VERDICT_BY_FLAG[surfability.overall]
+
   return (
     <section className="detail-sheet" aria-label={`Details for ${pin.name}`}>
       <header className="bottom-detail__header">
@@ -24,10 +42,18 @@ function LocationDetailPanel({ pin, buoyData, onClose }: LocationDetailPanelProp
         </button>
       </header>
 
+      <div className={`verdict-banner verdict-banner--${verdict.tone}`}>
+        <p className="verdict-banner__eyebrow">Verdict</p>
+        <h3 className="verdict-banner__headline">{verdict.headline}</h3>
+        {!loading && <p className="verdict-banner__summary">{surfability.summary}</p>}
+      </div>
+
+      <p className="bottom-detail__detail-label">The detail, if you want it</p>
+
       <div className="bottom-detail__body">
         <section className="bottom-detail__section">
           <h3>NOAA</h3>
-          <NoaaReadings buoyData={buoyData} variant="detail" />
+          <NoaaReadings buoyData={buoyData} variant="detail" showVerdict={false} />
         </section>
 
         <section className="bottom-detail__section bottom-detail__section--windy">
