@@ -2,6 +2,7 @@ import type { BuoyDataState } from '../hooks/useBuoyData'
 import type { SurfabilityFlag } from '../types/conditions'
 import type { LocationPin } from '../types/location'
 import { formatCoords, windyEmbedUrl } from '../types/location'
+import EmailCapture from './EmailCapture'
 import NoaaReadings from './NoaaReadings'
 
 type LocationDetailPanelProps = {
@@ -47,6 +48,8 @@ function LocationDetailPanel({ pin, buoyData, onClose }: LocationDetailPanelProp
         <h3 className="verdict-banner__headline">{verdict.headline}</h3>
         {!loading && <p className="verdict-banner__summary">{surfability.summary}</p>}
       </div>
+
+      <EmailCapture spotId={pin.spotId} spotName={pin.name} />
 
       <p className="bottom-detail__detail-label">The detail, if you want it</p>
 

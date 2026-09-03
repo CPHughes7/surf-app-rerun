@@ -1,12 +1,17 @@
 import os
+import re
 import time
+from datetime import datetime, timezone
 
 import httpx
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+import db
+
 app = FastAPI()
+db.init_db()
 
 DEFAULT_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
 allowed_origins = [
@@ -46,6 +51,37 @@ async def get_ndbc_latest_obs() -> Response:
     _ndbc_cache["at"] = now
     _ndbc_cache["body"] = upstream.text
     return Response(content=upstream.text, media_type="text/plain")
+
+
+EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+class NotifyMeInput(BaseModel):
+    email: str
+    spotId: str | None = None
+
+
+@app.post("/api/notify-me")
+def notify_me(payload: NotifyMeInput):
+    """Capture a "tell me when a session lines up" lead, optionally tied to a spot."""
+    email = payload.email.strip().lower()
+    if not email or not EMAIL_RE.match(email):
+        raise HTTPException(status_code=422, detail="Enter a valid email address")
+
+    spot_id = (payload.spotId or "").strip()
+    created_at = datetime.now(timezone.utc).isoformat()
+
+    with db.get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO subscribers (email, spot_id, created_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(email, spot_id) DO NOTHING
+            """,
+            (email, spot_id, created_at),
+        )
+
+    return {"ok": True}
 
 
 class LocationInput(BaseModel):
