@@ -51,7 +51,7 @@ Two frontend routes ([`frontend/src/App.tsx`](frontend/src/App.tsx)): `/` (publi
 **`/admin` — [`Admin.tsx`](frontend/src/pages/Admin.tsx)** is the paid capability, admin-only for now:
 
 - Gated by an `ADMIN_SECRET` entered once, stored client-side, sent as `X-Admin-Secret` — but the real boundary is server-side (see "Backend endpoints"); a wrong/missing secret gets a 401 from the API, never data
-- Create a spot by name/lat/lng/facing-direction → persisted via `POST /api/private-spots`
+- Create a spot by clicking a Leaflet map ([`AdminSpotMap.tsx`](frontend/src/components/AdminSpotMap.tsx), same pattern as the public `LakeMap`) — first click places it, second click sets a facing point, [`lib/geo/bearing.ts`](frontend/src/lib/geo/bearing.ts) computes the compass bearing between them. Only the name is typed; lat/lng/facingDeg are never hand-entered → persisted via `POST /api/private-spots`
 - Each listed spot's verdict is computed **client-side**, reusing the exact same seam as catalog spots ([`lib/conditions/resolveConditions.ts`](frontend/src/lib/conditions/resolveConditions.ts)) — a private spot is just a `SurfSpot` with no `windStationId`/`waveReferenceBuoyId`, which `noaa.ts` already falls back to nearest-in-range station for — then wrapped by [`lib/conditions/projection.ts`](frontend/src/lib/conditions/projection.ts), which adds an onshore/offshore wind-exposure adjustment and forces confidence to `'low'` with an explicit "Projected verdict" framing
 - No real Windy point-data source exists (no API key, still out of scope) — the wind side of the projection is nearshore-station-only, honestly reporting `'unknown'` exposure when nothing is in range rather than guessing
 
@@ -102,6 +102,8 @@ flowchart LR
 | [`frontend/src/lib/conditions/resolveConditions.ts`](frontend/src/lib/conditions/resolveConditions.ts) | Combines sources per spot (first-non-null); NOAA-only today; coordinate-agnostic (used by both `/` and `/admin`) |
 | [`frontend/src/lib/conditions/projection.ts`](frontend/src/lib/conditions/projection.ts) | Private-spot-only wrapper: onshore/offshore wind adjustment, forced low confidence, "Projected" framing |
 | [`frontend/src/lib/verdictCopy.ts`](frontend/src/lib/verdictCopy.ts) | Shared Go/Marginal/Not-today/No-verdict-yet headline+tone mapping |
+| [`frontend/src/components/AdminSpotMap.tsx`](frontend/src/components/AdminSpotMap.tsx) | Leaflet map for `/admin`: click-to-place spot, click-to-set facing point, existing spots shown as markers |
+| [`frontend/src/lib/geo/bearing.ts`](frontend/src/lib/geo/bearing.ts) | Compass bearing between two lat/lngs — turns the two map clicks into `facingDeg` |
 | [`frontend/src/lib/api.ts`](frontend/src/lib/api.ts) | `/api/notify-me` fetch helper (`VITE_API_URL`, defaults to relative/proxied) |
 | [`frontend/src/lib/adminApi.ts`](frontend/src/lib/adminApi.ts) | `/api/private-spots` fetch helpers (admin secret as a header) |
 | [`frontend/src/services/noaa.ts`](frontend/src/services/noaa.ts) | Parse NDBC, resolve wind vs wave stations (nearest-in-range fallback), short in-memory cache |
