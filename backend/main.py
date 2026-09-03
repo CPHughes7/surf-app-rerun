@@ -1,15 +1,51 @@
-from fastapi import FastAPI, HTTPException
+import os
+import time
+
+import httpx
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 app = FastAPI()
 
+DEFAULT_ORIGINS = "http://localhost:5173,http://127.0.0.1:5173"
+allowed_origins = [
+    origin.strip()
+    for origin in os.environ.get("ALLOWED_ORIGINS", DEFAULT_ORIGINS).split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+NDBC_LATEST_OBS_URL = "https://www.ndbc.noaa.gov/data/latest_obs/latest_obs.txt"
+NDBC_CACHE_SECONDS = 60
+_ndbc_cache: dict[str, object] = {"at": 0.0, "body": None}
+
+
+@app.get("/api/ndbc/latest_obs.txt")
+async def get_ndbc_latest_obs() -> Response:
+    """Server-side proxy for NDBC's latest_obs bulletin.
+
+    NDBC does not send Access-Control-Allow-Origin, so the browser can't
+    fetch it directly in production — this endpoint stands in for the
+    Vite dev proxy that only exists under `vite dev`.
+    """
+    now = time.monotonic()
+    if _ndbc_cache["body"] is not None and now - _ndbc_cache["at"] < NDBC_CACHE_SECONDS:
+        return Response(content=_ndbc_cache["body"], media_type="text/plain")
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        upstream = await client.get(NDBC_LATEST_OBS_URL)
+    upstream.raise_for_status()
+
+    _ndbc_cache["at"] = now
+    _ndbc_cache["body"] = upstream.text
+    return Response(content=upstream.text, media_type="text/plain")
 
 
 class LocationInput(BaseModel):
