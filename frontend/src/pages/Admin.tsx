@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { SurfSpot } from '../data/surfSpots'
+import { bearingDeg, compassLabel } from '../lib/geo/bearing'
 import { resolveAllConditions } from '../lib/conditions/resolveConditions'
 import { projectPrivateSpotVerdict, type PrivateSpotVerdict } from '../lib/conditions/projection'
 import { verdictCopyFor } from '../lib/verdictCopy'
@@ -9,6 +10,7 @@ import {
   listPrivateSpots,
   type PrivateSpot,
 } from '../lib/adminApi'
+import AdminSpotMap from '../components/AdminSpotMap'
 
 const SECRET_KEY = 'lakesurf.adminSecret'
 
@@ -126,7 +128,11 @@ function AdminPage() {
         </button>
       </header>
 
-      <CreateSpotForm secret={secret} onCreated={load} />
+      <CreateSpotForm
+        secret={secret}
+        existingSpots={entries.map((entry) => entry.spot)}
+        onCreated={load}
+      />
 
       {loading && <p className="admin-page__status">Loading…</p>}
       {error && (
@@ -145,7 +151,8 @@ function AdminPage() {
             <li key={spot.id} className="admin-spot-card">
               <h3>{spot.name}</h3>
               <p className="admin-spot-card__coords">
-                {spot.lat.toFixed(4)}, {spot.lng.toFixed(4)} · facing {spot.facingDeg.toFixed(0)}°
+                {spot.lat.toFixed(4)}, {spot.lng.toFixed(4)} · facing {compassLabel(spot.facingDeg)} (
+                {spot.facingDeg.toFixed(0)}°)
               </p>
               <div className={`verdict-banner verdict-banner--${copy.tone}`}>
                 <p className="verdict-banner__eyebrow">
@@ -162,29 +169,62 @@ function AdminPage() {
   )
 }
 
-function CreateSpotForm({ secret, onCreated }: { secret: string; onCreated: () => void }) {
+type LatLng = { lat: number; lng: number }
+
+function CreateSpotForm({
+  secret,
+  existingSpots,
+  onCreated,
+}: {
+  secret: string
+  existingSpots: PrivateSpot[]
+  onCreated: () => void
+}) {
   const [name, setName] = useState('')
-  const [lat, setLat] = useState('')
-  const [lng, setLng] = useState('')
-  const [facingDeg, setFacingDeg] = useState('')
+  const [draftLocation, setDraftLocation] = useState<LatLng | null>(null)
+  const [draftFacingPoint, setDraftFacingPoint] = useState<LatLng | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
+  const facingDeg =
+    draftLocation && draftFacingPoint
+      ? bearingDeg(draftLocation.lat, draftLocation.lng, draftFacingPoint.lat, draftFacingPoint.lng)
+      : null
+
+  const step = !draftLocation ? 'location' : !draftFacingPoint ? 'facing' : 'ready'
+
+  const handleMapClick = (lat: number, lng: number) => {
+    setFormError(null)
+    if (step === 'location') {
+      setDraftLocation({ lat, lng })
+    } else if (step === 'facing') {
+      setDraftFacingPoint({ lat, lng })
+    } else {
+      // Both already set — clicking again starts a new spot from scratch.
+      setDraftLocation({ lat, lng })
+      setDraftFacingPoint(null)
+    }
+  }
+
+  const handleReset = () => {
+    setDraftLocation(null)
+    setDraftFacingPoint(null)
+  }
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+    if (!draftLocation || facingDeg === null) return
     setSubmitting(true)
     setFormError(null)
     try {
       await createPrivateSpot(secret, {
         name,
-        lat: Number.parseFloat(lat),
-        lng: Number.parseFloat(lng),
-        facingDeg: Number.parseFloat(facingDeg),
+        lat: draftLocation.lat,
+        lng: draftLocation.lng,
+        facingDeg,
       })
       setName('')
-      setLat('')
-      setLng('')
-      setFacingDeg('')
+      handleReset()
       onCreated()
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Could not create spot')
@@ -195,8 +235,23 @@ function CreateSpotForm({ secret, onCreated }: { secret: string; onCreated: () =
 
   return (
     <form className="admin-create-form" onSubmit={handleSubmit}>
+      <p className="admin-create-form__hint">
+        {step === 'location' && 'Click the map where the break is.'}
+        {step === 'facing' &&
+          'Now click the direction it faces — straight out toward open water.'}
+        {step === 'ready' &&
+          `Facing ${compassLabel(facingDeg!)} (${facingDeg!.toFixed(0)}°). Click the map again to start over, or name it and create it.`}
+      </p>
+
+      <AdminSpotMap
+        existingSpots={existingSpots}
+        draftLocation={draftLocation}
+        draftFacingPoint={draftFacingPoint}
+        onMapClick={handleMapClick}
+      />
+
       <div className="admin-create-form__row">
-        <label>
+        <label className="admin-create-form__name-label">
           Name
           <input
             type="text"
@@ -204,49 +259,21 @@ function CreateSpotForm({ secret, onCreated }: { secret: string; onCreated: () =
             value={name}
             onChange={(event) => setName(event.target.value)}
             className="email-capture__input"
+            placeholder="What do you call this spot?"
           />
         </label>
-        <label>
-          Latitude
-          <input
-            type="number"
-            step="any"
-            required
-            min={-90}
-            max={90}
-            value={lat}
-            onChange={(event) => setLat(event.target.value)}
-            className="email-capture__input"
-          />
-        </label>
-        <label>
-          Longitude
-          <input
-            type="number"
-            step="any"
-            required
-            min={-180}
-            max={180}
-            value={lng}
-            onChange={(event) => setLng(event.target.value)}
-            className="email-capture__input"
-          />
-        </label>
-        <label>
-          Facing (° from N, toward water)
-          <input
-            type="number"
-            step="any"
-            required
-            min={0}
-            max={359}
-            value={facingDeg}
-            onChange={(event) => setFacingDeg(event.target.value)}
-            className="email-capture__input"
-          />
-        </label>
+        {draftLocation && (
+          <button type="button" className="btn btn--ghost" onClick={handleReset}>
+            Reset pin
+          </button>
+        )}
       </div>
-      <button type="submit" className="btn btn--primary" disabled={submitting}>
+
+      <button
+        type="submit"
+        className="btn btn--primary"
+        disabled={submitting || step !== 'ready' || !name.trim()}
+      >
         {submitting ? 'Creating…' : 'Create private spot'}
       </button>
       {formError && (
