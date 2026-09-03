@@ -1,7 +1,7 @@
 import type { BuoyDataState } from '../hooks/useBuoyData'
-import type { SurfabilityFlag } from '../types/conditions'
 import type { LocationPin } from '../types/location'
 import { formatCoords, windyEmbedUrl } from '../types/location'
+import { verdictCopyFor } from '../lib/verdictCopy'
 import EmailCapture from './EmailCapture'
 import NoaaReadings from './NoaaReadings'
 
@@ -11,23 +11,11 @@ type LocationDetailPanelProps = {
   onClose: () => void
 }
 
-type VerdictTone = 'go' | 'marginal' | 'no' | 'unknown'
-
-const VERDICT_BY_FLAG: Record<SurfabilityFlag, { headline: string; tone: VerdictTone }> = {
-  good: { headline: 'Go', tone: 'go' },
-  marginal: { headline: 'Marginal', tone: 'marginal' },
-  windOnly: { headline: 'Marginal', tone: 'marginal' },
-  staleData: { headline: 'Marginal', tone: 'marginal' },
-  tooSmall: { headline: 'Not today', tone: 'no' },
-  tooWindy: { headline: 'Not today', tone: 'no' },
-  missingData: { headline: 'No verdict yet', tone: 'unknown' },
-}
-
 function LocationDetailPanel({ pin, buoyData, onClose }: LocationDetailPanelProps) {
   const { surfability, loading } = buoyData
   const verdict = loading
-    ? { headline: 'Checking conditions…', tone: 'unknown' as VerdictTone }
-    : VERDICT_BY_FLAG[surfability.overall]
+    ? { headline: 'Checking conditions…', tone: 'unknown' as const }
+    : verdictCopyFor(surfability.overall)
 
   return (
     <section className="detail-sheet" aria-label={`Details for ${pin.name}`}>

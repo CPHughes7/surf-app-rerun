@@ -2,10 +2,10 @@ export type StationKind = 'cman' | 'lighthouse' | 'pier' | 'buoy'
 
 /**
  * Static NOAA station allowlist for nearest-station lookup.
- * Locations come from the backend API; station assignment is derived at read time.
- *
- * Future scale options (not implemented): optional windStationId/waveBuoyId on
- * backend locations, or an admin-managed station config file.
+ * Catalog spots (data/surfSpots.ts) pin a primary station by ID; any spot
+ * with no matching primary (including private spots at arbitrary
+ * coordinates, which have none) falls back to the nearest in-range
+ * candidate — see resolveWind/resolveWave in services/noaa.ts.
  */
 
 export type Station = {
