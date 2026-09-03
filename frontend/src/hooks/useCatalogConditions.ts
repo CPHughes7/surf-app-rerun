@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { SURF_SPOTS } from '../data/surfSpots'
+import { resolveAllConditions } from '../lib/conditions/resolveConditions'
 import { computeSurfability } from '../lib/surfability'
-import {
-  fetchNdbcLatestObs,
-  spotConditionsFromObservations,
-} from '../services/noaa'
 import type { SpotConditions, SurfabilityScore } from '../types/conditions'
 import type { BuoyDataState } from './useBuoyData'
 import { EMPTY_SURFABILITY } from './useBuoyData'
@@ -30,12 +27,12 @@ export function useCatalogConditions(): CatalogConditionsState {
     setLoading(true)
     setError(null)
 
-    fetchNdbcLatestObs()
-      .then((observations) => {
+    resolveAllConditions(SURF_SPOTS)
+      .then((conditionsBySpotId) => {
         if (cancelled) return
         const next: Record<string, SpotBuoyEntry> = {}
         for (const spot of SURF_SPOTS) {
-          const conditions = spotConditionsFromObservations(spot, observations)
+          const conditions = conditionsBySpotId.get(spot.id) ?? null
           next[spot.id] = {
             conditions,
             surfability: computeSurfability(conditions),
