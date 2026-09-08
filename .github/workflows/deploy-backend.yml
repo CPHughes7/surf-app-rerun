@@ -1,0 +1,36 @@
+name: Deploy backend to Fly.io
+
+on:
+  push:
+    branches: [dev/rebuild, main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-backend-${{ github.ref_name }}
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Pick environment config for this branch
+        id: env
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "config=fly.production.toml" >> "$GITHUB_OUTPUT"
+          else
+            echo "config=fly.staging.toml" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy
+        working-directory: backend
+        run: flyctl deploy --config ${{ steps.env.outputs.config }} --remote-only
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

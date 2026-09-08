@@ -2,7 +2,7 @@
 
 Attach this file (`@CONTEXT.md`) when starting a new chat. The short always-on rule in `.cursor/rules/project-context.mdc` points here. See also [PARKED.md](PARKED.md) for ideas that were built, then deliberately shelved (not lost — full code recoverable from git history).
 
-**As of 2026-09-03.** Working branch: `dev/rebuild`. Last commit: `89ece11` ("Ship the MVP paid tier: create a private spot anywhere, get a projected verdict"). Nothing has been merged to `main` or deployed.
+**As of 2026-09-08.** Working branch: `dev/rebuild`. CI/CD pipelines for both environments are now committed (see "CI/CD" below) but **not yet live** — they need the one-time Fly.io/GitHub-secrets setup listed there before either environment actually deploys. Nothing has been merged to `main` yet.
 
 ---
 
@@ -139,15 +139,32 @@ Scoring thresholds (unchanged): too flat &lt; 1.5 ft; good ≥ 2.5 ft; too windy
 
 ---
 
-## Production deploy (what `main` / the S3 pipeline still needs)
+## CI/CD — two environments, both automated
 
-Verified on `dev/rebuild`, not done (needs infra choices/credentials this session doesn't have):
+Priority for this pipeline: as free/cheap as possible, minimum manual steps, and the app itself stays easy to redo — the durable thing being protected is the data (NOAA fusion logic, subscriber/private-spot rows), not any particular deploy mechanism. If Fly.io turns out to be the wrong call later, swapping it is a config-file-level change, not a rewrite.
 
-1. **Deploy `backend/` somewhere reachable over HTTPS.** Any small Python host works (Render, Fly.io, Railway, an EC2 box, etc.) — host not chosen here. Install from `backend/requirements.txt`, run with e.g. `uvicorn main:app --host 0.0.0.0 --port $PORT`. Set a real `ADMIN_SECRET` env var (the private-spots endpoints fail closed without one) and a persistent `APP_DB_PATH` (defaults to a file next to `main.py` — fine only if the host's filesystem isn't ephemeral between deploys).
-2. **Set `VITE_NDBC_URL`** and **`VITE_API_URL`** as build-time env/secrets in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml), both pointing at `https://<backend-host>` (`VITE_NDBC_URL` needs the full `/api/ndbc/latest_obs.txt` path; `VITE_API_URL` is just the origin — `lib/api.ts` and `lib/adminApi.ts` append their own paths).
-3. **Set `ALLOWED_ORIGINS`** on the deployed backend (comma-separated env var, defaults to localhost dev origins only) to the production S3/CloudFront domain.
+**Frontend (S3, both environments):**
+- `main` push → [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) → existing production bucket (`secrets.S3_BUCKET`). Untouched except adding the two `VITE_*` build env vars below.
+- `dev/rebuild` push → [`.github/workflows/deploy-frontend-staging.yml`](.github/workflows/deploy-frontend-staging.yml) → a **separate** staging bucket (`secrets.S3_BUCKET_STAGING`), auto-created + configured for static website hosting on first run if it doesn't exist yet. Never touches the production bucket.
 
-Without this, the deployed frontend still builds and serves, but NOAA data, email capture, and the admin private-spots panel all fail against the S3 origin (no backend to talk to).
+**Backend (Fly.io, both environments):**
+- [`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) triggers on push to either branch, picks [`backend/fly.staging.toml`](backend/fly.staging.toml) or [`backend/fly.production.toml`](backend/fly.production.toml) by branch, deploys via `flyctl deploy --remote-only` (Fly builds the [`Dockerfile`](backend/Dockerfile) remotely — no Docker needed locally or in CI).
+- Two separate Fly apps (`lake-surf-api-staging`, `lake-surf-api`), each with its **own persistent volume** mounted at `/data` (`APP_DB_PATH=/data/app.db`) — staging and production data never mix, and the SQLite file survives restarts/redeploys without needing a managed DB migration right now.
+- Credentials are naturally separated from the frontend's AWS keys: `FLY_API_TOKEN` is a different provider entirely, not a broader AWS grant.
+- Both apps scale to zero when idle (`min_machines_running = 0`) to minimize cost — first request after idle has a cold-start delay. Bump to `1` in the relevant `fly.*.toml` if that becomes annoying for production.
+
+**One-time manual setup (not automatable — needs your own account/CLI):**
+
+1. Create a Fly.io account, then locally: `fly auth login`.
+2. `fly apps create lake-surf-api-staging` and `fly apps create lake-surf-api` — **app names are globally unique across all Fly users**; if either is taken, pick alternatives and update them in both `fly.*.toml` files, `.github/workflows/deploy.yml`, and `deploy-frontend-staging.yml` (the `VITE_NDBC_URL`/`VITE_API_URL` values are hardcoded to `https://lake-surf-api[-staging].fly.dev`).
+3. `fly volumes create surf_data_staging --app lake-surf-api-staging --region ord --size 1` and the same for `surf_data_prod --app lake-surf-api`.
+4. `fly secrets set ADMIN_SECRET=<pick-something-real> --app lake-surf-api-staging` (and again for `lake-surf-api` with a different value). `ALLOWED_ORIGINS` too, once you know the staging/prod frontend URLs (`fly secrets set ALLOWED_ORIGINS=https://<bucket>.s3-website-<region>.amazonaws.com --app <fly-app>`).
+5. `fly tokens create` (or `fly auth token`) → add as GitHub repo secret `FLY_API_TOKEN`.
+6. Pick a globally-unique staging bucket name → add as GitHub repo secret `S3_BUCKET_STAGING`. (Existing `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_REGION`/`S3_BUCKET` are reused as-is — no new AWS credentials needed. If that IAM user is scoped narrowly to just the production bucket, the staging workflow's bucket-creation step will fail with AccessDenied; either broaden it to allow `s3:CreateBucket`/`PutBucketPolicy`/`PutBucketWebsite`/`PutPublicAccessBlock`, or create the staging bucket yourself once and I'll drop that step.)
+
+None of steps 1–6 involve pasting a secret to me or into this repo — GitHub secrets and Fly's own secret store are the only places they live.
+
+Not done: swapping `VITE_NDBC_URL`/`VITE_API_URL` in `deploy.yml` if the Fly app name changes from the placeholder above; verifying the whole loop end-to-end once secrets are in place (push to `dev/rebuild`, check the Actions tab, hit the staging URL).
 
 ---
 

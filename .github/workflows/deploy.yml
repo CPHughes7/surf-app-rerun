@@ -23,7 +23,10 @@ jobs:
 
             - name: Build
               run: npm run build
-            
+              env:
+                VITE_NDBC_URL: https://lake-surf-api.fly.dev/api/ndbc/latest_obs.txt
+                VITE_API_URL: https://lake-surf-api.fly.dev
+
             - name: Configure AWS credentials
               uses: aws-actions/configure-aws-credentials@v4
               with: 

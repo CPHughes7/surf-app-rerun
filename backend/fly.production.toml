@@ -1,0 +1,36 @@
+# Fly.io app config for PRODUCTION backend (deployed from main).
+# One-time setup before CI can deploy to this — see CONTEXT.md "CI/CD" section.
+app = "lake-surf-api"
+primary_region = "ord"
+
+[build]
+
+[env]
+  APP_DB_PATH = "/data/app.db"
+  # ALLOWED_ORIGINS and ADMIN_SECRET are set once via `fly secrets set`, not here
+  # (this file is committed to git; secrets never go in it).
+
+[mounts]
+  source = "surf_data_prod"
+  destination = "/data"
+
+[[services]]
+  internal_port = 8080
+  protocol = "tcp"
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  [[services.http_checks]]
+    path = "/api/ndbc/latest_obs.txt"
+    interval = "30s"
+    timeout = "5s"
