@@ -54,17 +54,30 @@ async def get_ndbc_latest_obs() -> Response:
     return Response(content=upstream.text, media_type="text/plain")
 
 
+def require_admin_secret(x_admin_secret: str | None = Header(default=None)) -> None:
+    expected = os.environ.get("ADMIN_SECRET", "")
+    # Fail closed: an unset secret must never match an absent/empty header.
+    if not expected or x_admin_secret != expected:
+        raise HTTPException(status_code=401, detail="Invalid admin secret")
+
+
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 class NotifyMeInput(BaseModel):
     email: str
     spotId: str | None = None
+    utmSource: str | None = None
+    utmMedium: str | None = None
+    utmCampaign: str | None = None
+    referrer: str | None = None
 
 
 @app.post("/api/notify-me")
 def notify_me(payload: NotifyMeInput):
-    """Capture a "tell me when a session lines up" lead, optionally tied to a spot."""
+    """Capture a "tell me when a session lines up" lead, optionally tied to a
+    spot. Also records first-touch channel attribution (utm_* / referrer) so
+    interest can be broken down by marketing channel later."""
     email = payload.email.strip().lower()
     if not email or not EMAIL_RE.match(email):
         raise HTTPException(status_code=422, detail="Enter a valid email address")
@@ -75,21 +88,62 @@ def notify_me(payload: NotifyMeInput):
     with db.get_connection() as conn:
         conn.execute(
             """
-            INSERT INTO subscribers (email, spot_id, created_at)
-            VALUES (?, ?, ?)
+            INSERT INTO subscribers (email, spot_id, utm_source, utm_medium, utm_campaign, referrer, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(email, spot_id) DO NOTHING
             """,
-            (email, spot_id, created_at),
+            (
+                email,
+                spot_id,
+                payload.utmSource,
+                payload.utmMedium,
+                payload.utmCampaign,
+                payload.referrer,
+                created_at,
+            ),
         )
 
     return {"ok": True}
 
 
-def require_admin_secret(x_admin_secret: str | None = Header(default=None)) -> None:
-    expected = os.environ.get("ADMIN_SECRET", "")
-    # Fail closed: an unset secret must never match an absent/empty header.
-    if not expected or x_admin_secret != expected:
-        raise HTTPException(status_code=401, detail="Invalid admin secret")
+@app.get("/api/notify-me/stats")
+def notify_me_stats(_: None = Depends(require_admin_secret)):
+    """Total interest, and a breakdown by marketing channel (utm_source)."""
+    with db.get_connection() as conn:
+        total = conn.execute("SELECT COUNT(*) AS n FROM subscribers").fetchone()["n"]
+        by_source = conn.execute(
+            """
+            SELECT COALESCE(NULLIF(utm_source, ''), '(none)') AS source, COUNT(*) AS count
+            FROM subscribers
+            GROUP BY source
+            ORDER BY count DESC
+            """
+        ).fetchall()
+        recent = conn.execute(
+            """
+            SELECT email, spot_id, utm_source, utm_medium, utm_campaign, referrer, created_at
+            FROM subscribers
+            ORDER BY created_at DESC
+            LIMIT 25
+            """
+        ).fetchall()
+
+    return {
+        "total": total,
+        "bySource": [{"source": row["source"], "count": row["count"]} for row in by_source],
+        "recent": [
+            {
+                "email": row["email"],
+                "spotId": row["spot_id"] or None,
+                "utmSource": row["utm_source"],
+                "utmMedium": row["utm_medium"],
+                "utmCampaign": row["utm_campaign"],
+                "referrer": row["referrer"],
+                "createdAt": row["created_at"],
+            }
+            for row in recent
+        ],
+    }
 
 
 class PrivateSpotInput(BaseModel):

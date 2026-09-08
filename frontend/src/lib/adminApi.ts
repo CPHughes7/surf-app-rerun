@@ -49,3 +49,24 @@ export async function createPrivateSpot(
   }
   return response.json()
 }
+
+export type NotifyMeStats = {
+  total: number
+  bySource: { source: string; count: number }[]
+  recent: {
+    email: string
+    spotId: string | null
+    utmSource: string | null
+    utmMedium: string | null
+    utmCampaign: string | null
+    referrer: string | null
+    createdAt: string
+  }[]
+}
+
+export async function getNotifyStats(secret: string): Promise<NotifyMeStats> {
+  const response = await adminFetch('/api/notify-me/stats', secret)
+  if (response.status === 401) throw new Error('unauthorized')
+  if (!response.ok) throw new Error('Could not load interest stats')
+  return response.json()
+}

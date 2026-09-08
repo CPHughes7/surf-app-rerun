@@ -19,6 +19,10 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 email TEXT NOT NULL,
                 spot_id TEXT NOT NULL DEFAULT '',
+                utm_source TEXT,
+                utm_medium TEXT,
+                utm_campaign TEXT,
+                referrer TEXT,
                 created_at TEXT NOT NULL,
                 UNIQUE(email, spot_id)
             )

@@ -7,7 +7,9 @@ import { verdictCopyFor } from '../lib/verdictCopy'
 import { qualityLabel } from '../lib/surfability'
 import {
   createPrivateSpot,
+  getNotifyStats,
   listPrivateSpots,
+  type NotifyMeStats,
   type PrivateSpot,
 } from '../lib/adminApi'
 import AdminSpotMap from '../components/AdminSpotMap'
@@ -40,6 +42,7 @@ function AdminPage() {
   const [secret, setSecretState] = useState<string | null>(readStoredSecret)
   const [secretInput, setSecretInput] = useState('')
   const [entries, setEntries] = useState<SpotEntry[]>([])
+  const [stats, setStats] = useState<NotifyMeStats | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -58,7 +61,7 @@ function AdminPage() {
     setLoading(true)
     setError(null)
     try {
-      const spots = await listPrivateSpots(secret)
+      const [spots, notifyStats] = await Promise.all([listPrivateSpots(secret), getNotifyStats(secret)])
       const conditionsBySpotId = await resolveAllConditions(spots.map(toSurfSpot))
       setEntries(
         spots.map((spot) => ({
@@ -66,6 +69,7 @@ function AdminPage() {
           verdict: projectPrivateSpotVerdict(conditionsBySpotId.get(spot.id) ?? null, spot.facingDeg),
         })),
       )
+      setStats(notifyStats)
     } catch (err) {
       if (err instanceof Error && err.message === 'unauthorized') {
         setSecret(null)
@@ -122,11 +126,15 @@ function AdminPage() {
   return (
     <div className="admin-page">
       <header className="admin-page__header">
-        <h1>Private spots</h1>
+        <h1>Admin</h1>
         <button type="button" className="btn btn--ghost" onClick={() => setSecret(null)}>
           Lock
         </button>
       </header>
+
+      <InterestStats stats={stats} />
+
+      <h2 className="admin-page__section-title">Private spots</h2>
 
       <CreateSpotForm
         secret={secret}
@@ -166,6 +174,49 @@ function AdminPage() {
         })}
       </ul>
     </div>
+  )
+}
+
+function InterestStats({ stats }: { stats: NotifyMeStats | null }) {
+  if (!stats) return null
+
+  return (
+    <section className="admin-stats">
+      <p className="admin-stats__total">
+        <strong>{stats.total}</strong> {stats.total === 1 ? 'person has' : 'people have'} asked to be notified
+      </p>
+
+      {stats.bySource.length > 0 && (
+        <div className="admin-stats__sources">
+          <p className="admin-page__section-title admin-page__section-title--small">By channel</p>
+          <ul className="admin-stats__source-list">
+            {stats.bySource.map((row) => (
+              <li key={row.source} className="admin-stats__source-row">
+                <span>{row.source}</span>
+                <span className="admin-stats__source-count">{row.count}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {stats.recent.length > 0 && (
+        <details className="admin-stats__recent">
+          <summary>Most recent ({stats.recent.length})</summary>
+          <ul>
+            {stats.recent.map((row) => (
+              <li key={`${row.email}-${row.createdAt}`}>
+                {row.email}
+                {row.spotId ? ` · ${row.spotId}` : ''}
+                {row.utmSource ? ` · ${row.utmSource}` : row.referrer ? ` · via ${row.referrer}` : ''}
+                {' · '}
+                {new Date(row.createdAt).toLocaleString()}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
   )
 }
 
