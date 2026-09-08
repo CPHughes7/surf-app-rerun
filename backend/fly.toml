@@ -1,6 +1,8 @@
-# Fly.io app config for the STAGING backend (deployed from dev/rebuild).
-# One-time setup before CI can deploy to this — see CONTEXT.md "CI/CD" section.
-app = "lake-surf-api-staging"
+# Fly.io app config for the backend (deployed from main).
+# One environment for now — this is a demand-validation phase, not a
+# multi-env production system yet. One-time setup before CI can deploy
+# to this — see CONTEXT.md "CI/CD" section.
+app = "lake-surf-api"
 primary_region = "ord"
 
 [build]
@@ -11,7 +13,7 @@ primary_region = "ord"
   # (this file is committed to git; secrets never go in it).
 
 [mounts]
-  source = "surf_data_staging"
+  source = "surf_data"
   destination = "/data"
 
 [[services]]

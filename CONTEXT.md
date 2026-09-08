@@ -2,7 +2,7 @@
 
 Attach this file (`@CONTEXT.md`) when starting a new chat. The short always-on rule in `.cursor/rules/project-context.mdc` points here. See also [PARKED.md](PARKED.md) for ideas that were built, then deliberately shelved (not lost — full code recoverable from git history).
 
-**As of 2026-09-08.** Working branch: `dev/rebuild`. CI/CD pipelines for both environments are now committed (see "CI/CD" below) but **not yet live** — they need the one-time Fly.io/GitHub-secrets setup listed there before either environment actually deploys. Nothing has been merged to `main` yet.
+**As of 2026-09-08.** Working branch: `dev/rebuild`. Current priority: **demand validation**, not paid-tier build-out — get the free product live, measure who's interested and from which channel. CI/CD (one environment, production-only — see "CI/CD" below) is committed but **not yet live**; needs the one-time Fly.io/GitHub-secrets setup listed there. Nothing has been merged to `main` yet.
 
 ---
 
@@ -54,6 +54,7 @@ Two frontend routes ([`frontend/src/App.tsx`](frontend/src/App.tsx)): `/` (publi
 - Create a spot by clicking a Leaflet map ([`AdminSpotMap.tsx`](frontend/src/components/AdminSpotMap.tsx), same pattern as the public `LakeMap`) — first click places it, second click sets a facing point, [`lib/geo/bearing.ts`](frontend/src/lib/geo/bearing.ts) computes the compass bearing between them. Only the name is typed; lat/lng/facingDeg are never hand-entered → persisted via `POST /api/private-spots`
 - Each listed spot's verdict is computed **client-side**, reusing the exact same seam as catalog spots ([`lib/conditions/resolveConditions.ts`](frontend/src/lib/conditions/resolveConditions.ts)) — a private spot is just a `SurfSpot` with no `windStationId`/`waveReferenceBuoyId`, which `noaa.ts` already falls back to nearest-in-range station for — then wrapped by [`lib/conditions/projection.ts`](frontend/src/lib/conditions/projection.ts), which adds an onshore/offshore wind-exposure adjustment and forces confidence to `'low'` with an explicit "Projected verdict" framing
 - No real Windy point-data source exists (no API key, still out of scope) — the wind side of the projection is nearshore-station-only, honestly reporting `'unknown'` exposure when nothing is in range rather than guessing
+- Leads with an **interest dashboard**: total signups + a by-channel breakdown ([`GET /api/notify-me/stats`](backend/main.py)) — every `/api/notify-me` submission from `/` carries first-touch UTM/referrer attribution ([`lib/attribution.ts`](frontend/src/lib/attribution.ts)), so this is the actual answer to "who's interested and from where"
 
 Vite proxies `/api/ndbc/latest_obs.txt` straight to NOAA (dev only) and everything else under `/api` to the local backend ([`vite.config.ts`](frontend/vite.config.ts)).
 
@@ -139,32 +140,25 @@ Scoring thresholds (unchanged): too flat &lt; 1.5 ft; good ≥ 2.5 ft; too windy
 
 ---
 
-## CI/CD — two environments, both automated
+## CI/CD — one environment, automated
 
-Priority for this pipeline: as free/cheap as possible, minimum manual steps, and the app itself stays easy to redo — the durable thing being protected is the data (NOAA fusion logic, subscriber/private-spot rows), not any particular deploy mechanism. If Fly.io turns out to be the wrong call later, swapping it is a config-file-level change, not a rewrite.
+Deliberately **one environment** (production, deployed from `main`), not the dev+prod split from a couple sessions ago. Current phase is demand validation — establish who's interested and which channel actually works, via [attribution.ts](frontend/src/lib/attribution.ts) + the `/admin` interest stats — not running paid-tier infrastructure nobody's paying for yet. A second environment is one more Fly app + one more S3 bucket away whenever it's actually needed again; nothing here forecloses that.
 
-**Frontend (S3, both environments):**
-- `main` push → [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) → existing production bucket (`secrets.S3_BUCKET`). Untouched except adding the two `VITE_*` build env vars below.
-- `dev/rebuild` push → [`.github/workflows/deploy-frontend-staging.yml`](.github/workflows/deploy-frontend-staging.yml) → a **separate** staging bucket (`secrets.S3_BUCKET_STAGING`), auto-created + configured for static website hosting on first run if it doesn't exist yet. Never touches the production bucket.
+**Frontend (S3):** `main` push → [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) → the existing production bucket (`secrets.S3_BUCKET`). Unchanged except for the two `VITE_*` build env vars below, which it needs to actually reach the backend.
 
-**Backend (Fly.io, both environments):**
-- [`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) triggers on push to either branch, picks [`backend/fly.staging.toml`](backend/fly.staging.toml) or [`backend/fly.production.toml`](backend/fly.production.toml) by branch, deploys via `flyctl deploy --remote-only` (Fly builds the [`Dockerfile`](backend/Dockerfile) remotely — no Docker needed locally or in CI).
-- Two separate Fly apps (`lake-surf-api-staging`, `lake-surf-api`), each with its **own persistent volume** mounted at `/data` (`APP_DB_PATH=/data/app.db`) — staging and production data never mix, and the SQLite file survives restarts/redeploys without needing a managed DB migration right now.
-- Credentials are naturally separated from the frontend's AWS keys: `FLY_API_TOKEN` is a different provider entirely, not a broader AWS grant.
-- Both apps scale to zero when idle (`min_machines_running = 0`) to minimize cost — first request after idle has a cold-start delay. Bump to `1` in the relevant `fly.*.toml` if that becomes annoying for production.
+**Backend (Fly.io):** `main` push (when `backend/**` changes) → [`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) → `flyctl deploy --remote-only` using [`backend/fly.toml`](backend/fly.toml) (Fly builds the [`Dockerfile`](backend/Dockerfile) remotely — no Docker needed locally or in CI). Persistent volume mounted at `/data` (`APP_DB_PATH=/data/app.db`) so SQLite survives restarts/redeploys. Scales to zero when idle (`min_machines_running = 0`) to minimize cost — first request after idle has a cold-start delay; bump to `1` in `fly.toml` if that becomes annoying. `FLY_API_TOKEN` is a different provider from the frontend's AWS keys, not a broader AWS grant.
 
 **One-time manual setup (not automatable — needs your own account/CLI):**
 
 1. Create a Fly.io account, then locally: `fly auth login`.
-2. `fly apps create lake-surf-api-staging` and `fly apps create lake-surf-api` — **app names are globally unique across all Fly users**; if either is taken, pick alternatives and update them in both `fly.*.toml` files, `.github/workflows/deploy.yml`, and `deploy-frontend-staging.yml` (the `VITE_NDBC_URL`/`VITE_API_URL` values are hardcoded to `https://lake-surf-api[-staging].fly.dev`).
-3. `fly volumes create surf_data_staging --app lake-surf-api-staging --region ord --size 1` and the same for `surf_data_prod --app lake-surf-api`.
-4. `fly secrets set ADMIN_SECRET=<pick-something-real> --app lake-surf-api-staging` (and again for `lake-surf-api` with a different value). `ALLOWED_ORIGINS` too, once you know the staging/prod frontend URLs (`fly secrets set ALLOWED_ORIGINS=https://<bucket>.s3-website-<region>.amazonaws.com --app <fly-app>`).
+2. `fly apps create lake-surf-api` — **app names are globally unique across all Fly users**; if taken, pick an alternative and update it in `backend/fly.toml`'s `app =` line and in `.github/workflows/deploy.yml`'s two `VITE_*` values (hardcoded to `https://lake-surf-api.fly.dev`).
+3. `fly volumes create surf_data --app lake-surf-api --region ord --size 1`.
+4. `fly secrets set ADMIN_SECRET=<pick-something-real> --app lake-surf-api`. `ALLOWED_ORIGINS` too, once you know the production frontend URL (`fly secrets set ALLOWED_ORIGINS=https://<bucket>.s3-website-<region>.amazonaws.com --app lake-surf-api`).
 5. `fly tokens create` (or `fly auth token`) → add as GitHub repo secret `FLY_API_TOKEN`.
-6. Pick a globally-unique staging bucket name → add as GitHub repo secret `S3_BUCKET_STAGING`. (Existing `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_REGION`/`S3_BUCKET` are reused as-is — no new AWS credentials needed. If that IAM user is scoped narrowly to just the production bucket, the staging workflow's bucket-creation step will fail with AccessDenied; either broaden it to allow `s3:CreateBucket`/`PutBucketPolicy`/`PutBucketWebsite`/`PutPublicAccessBlock`, or create the staging bucket yourself once and I'll drop that step.)
 
-None of steps 1–6 involve pasting a secret to me or into this repo — GitHub secrets and Fly's own secret store are the only places they live.
+None of these steps involve pasting a secret to me or into this repo — GitHub secrets and Fly's own secret store are the only places they live. No new AWS credentials needed; the existing `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_REGION`/`S3_BUCKET` secrets are reused as-is.
 
-Not done: swapping `VITE_NDBC_URL`/`VITE_API_URL` in `deploy.yml` if the Fly app name changes from the placeholder above; verifying the whole loop end-to-end once secrets are in place (push to `dev/rebuild`, check the Actions tab, hit the staging URL).
+Not done: verifying the whole loop end-to-end once secrets are in place (push to `main`, check the Actions tab, hit the live URL).
 
 ---
 
