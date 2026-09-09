@@ -63,6 +63,11 @@ def require_admin_secret(x_admin_secret: str | None = Header(default=None)) -> N
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
+# Sentinel spotId for the public "point anywhere, get a verdict" pitch —
+# not a real catalog spot. Reuses the subscribers table/endpoint as-is
+# (same UNIQUE(email, spot_id) idempotency) rather than a new table.
+ADVANCED_INTEREST_SPOT_ID = "advanced-analysis"
+
 
 class NotifyMeInput(BaseModel):
     email: str
@@ -108,9 +113,15 @@ def notify_me(payload: NotifyMeInput):
 
 @app.get("/api/notify-me/stats")
 def notify_me_stats(_: None = Depends(require_admin_secret)):
-    """Total interest, and a breakdown by marketing channel (utm_source)."""
+    """How many people are interested, period — plus how many of those
+    specifically want the advanced (point-anywhere) capability. Channel
+    breakdown is kept but secondary; the headline number is just the count."""
     with db.get_connection() as conn:
         total = conn.execute("SELECT COUNT(*) AS n FROM subscribers").fetchone()["n"]
+        advanced_interest = conn.execute(
+            "SELECT COUNT(*) AS n FROM subscribers WHERE spot_id = ?",
+            (ADVANCED_INTEREST_SPOT_ID,),
+        ).fetchone()["n"]
         by_source = conn.execute(
             """
             SELECT COALESCE(NULLIF(utm_source, ''), '(none)') AS source, COUNT(*) AS count
@@ -130,6 +141,7 @@ def notify_me_stats(_: None = Depends(require_admin_secret)):
 
     return {
         "total": total,
+        "advancedInterest": advanced_interest,
         "bySource": [{"source": row["source"], "count": row["count"]} for row in by_source],
         "recent": [
             {

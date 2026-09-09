@@ -182,27 +182,28 @@ function InterestStats({ stats }: { stats: NotifyMeStats | null }) {
 
   return (
     <section className="admin-stats">
-      <p className="admin-stats__total">
-        <strong>{stats.total}</strong> {stats.total === 1 ? 'person has' : 'people have'} asked to be notified
-      </p>
+      <div className="admin-stats__headline-row">
+        <p className="admin-stats__total">
+          <strong>{stats.total}</strong> {stats.total === 1 ? 'person' : 'people'} interested
+        </p>
+        <p className="admin-stats__total admin-stats__total--secondary">
+          <strong>{stats.advancedInterest}</strong> want advanced analysis
+        </p>
+      </div>
 
-      {stats.bySource.length > 0 && (
-        <div className="admin-stats__sources">
-          <p className="admin-page__section-title admin-page__section-title--small">By channel</p>
-          <ul className="admin-stats__source-list">
-            {stats.bySource.map((row) => (
-              <li key={row.source} className="admin-stats__source-row">
-                <span>{row.source}</span>
-                <span className="admin-stats__source-count">{row.count}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {stats.recent.length > 0 && (
+      {(stats.bySource.length > 0 || stats.recent.length > 0) && (
         <details className="admin-stats__recent">
-          <summary>Most recent ({stats.recent.length})</summary>
+          <summary>Detail — by channel, most recent</summary>
+          {stats.bySource.length > 0 && (
+            <ul className="admin-stats__source-list">
+              {stats.bySource.map((row) => (
+                <li key={row.source} className="admin-stats__source-row">
+                  <span>{row.source}</span>
+                  <span className="admin-stats__source-count">{row.count}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           <ul>
             {stats.recent.map((row) => (
               <li key={`${row.email}-${row.createdAt}`}>

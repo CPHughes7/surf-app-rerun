@@ -52,6 +52,7 @@ export async function createPrivateSpot(
 
 export type NotifyMeStats = {
   total: number
+  advancedInterest: number
   bySource: { source: string; count: number }[]
   recent: {
     email: string

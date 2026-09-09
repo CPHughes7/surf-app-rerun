@@ -2,6 +2,7 @@ import type { CatalogConditionsState } from '../hooks/useCatalogConditions'
 import { buoyDataForSpot } from '../hooks/useCatalogConditions'
 import type { LocationPin } from '../types/location'
 import { formatCoords } from '../types/location'
+import AdvancedAnalysisPitch from './AdvancedAnalysisPitch'
 import SurfabilityBadge from './SurfabilityBadge'
 
 type LocationsPanelProps = {
@@ -83,6 +84,8 @@ function LocationsPanel({
           </div>
         ))}
       </nav>
+
+      <AdvancedAnalysisPitch />
     </aside>
   )
 }
