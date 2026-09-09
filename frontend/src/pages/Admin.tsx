@@ -83,6 +83,10 @@ function AdminPage() {
   }, [secret, setSecret])
 
   useEffect(() => {
+    // load() sets loading/error before its first await so a re-fetch (e.g.
+    // after unlocking with a new secret) shows the loading state again —
+    // intentional, not the accidental-cascading-render case this rule guards.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load()
   }, [load])
 

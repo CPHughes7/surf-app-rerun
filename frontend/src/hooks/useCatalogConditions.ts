@@ -24,8 +24,6 @@ export function useCatalogConditions(): CatalogConditionsState {
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    setError(null)
 
     resolveAllConditions(SURF_SPOTS)
       .then((conditionsBySpotId) => {

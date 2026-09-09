@@ -36,7 +36,7 @@ For the end-to-end pipeline narrative (fetch → parse → resolve → score), s
 
 **Dev:** `npm run dev` fetches NOAA via the Vite proxy at `/api/ndbc/latest_obs.txt` (no CORS issue).
 
-**Production:** deployed builds still need `VITE_NDBC_URL` pointing at a server-side proxy — not set yet.
+**Production:** `VITE_NDBC_URL` is wired in `.github/workflows/deploy.yml`, pointing at the Fly.io-hosted backend proxy — see `CONTEXT.md`'s "CI/CD" section for the one-time setup this still needs before it's actually live.
 
 Use `npm run test:data` to validate parsing logic from Node (direct NDBC URL, no browser).
 

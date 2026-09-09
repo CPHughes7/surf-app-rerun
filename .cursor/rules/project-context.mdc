@@ -1,0 +1,26 @@
+---
+description: Product, branch, and data rules for surf-app-rerun. Full map is CONTEXT.md.
+alwaysApply: true
+---
+
+# surf-app-rerun
+
+Lake Michigan surf map: catalog spots, live NOAA (nearshore wind + offshore waves), surfability scores, Windy embed, email capture, and an admin-gated paid-tier MVP (create a spot anywhere, get a projected verdict). Frontend-first. Prefer a better site over learning scaffolding.
+
+**Full handoff:** read [`CONTEXT.md`](CONTEXT.md) before changing architecture or data. Attach `@CONTEXT.md` in new chats that need the file map.
+
+## Branch
+
+- Work on `dev/rebuild`. Fast refactors are expected.
+- `learn/v1` is frozen. Do not commit feature work there.
+- `main` is S3 (frontend) + Fly.io (backend) deploy. Do not push there unless asked to ship.
+
+## Data rules
+
+- Wind from nearshore stations only. Waves from offshore buoy allowlist only. Never read WVHT from nearshore.
+- Catalog-only selection (~15 km snap) on the public map. Do not restore the backend's legacy location-CRUD endpoints into the UI.
+- Do not change scoring thresholds or station allowlists unless asked.
+
+## Run
+
+`cd frontend && npm run dev` — NOAA via Vite proxy, `/api/*` proxied to a local backend on :8000. `cd backend && ADMIN_SECRET=... uvicorn main:app --port 8000` in a second terminal. The backend is in active use — NOAA proxy, email capture, private-spots — not unused; only its original location-CRUD endpoints are legacy and left alone.

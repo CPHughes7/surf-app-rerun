@@ -42,7 +42,7 @@ The app fetches this one giant file once per spot selection. Because the browser
 const NDBC_LATEST_URL = import.meta.env?.VITE_NDBC_URL ?? '/api/ndbc/latest_obs.txt'
 ```
 
-In production (S3 deploy), `VITE_NDBC_URL` would point to a real proxy; it is currently not wired. The FastAPI backend at **`backend/main.py`** is *not* involved in NOAA data — it handles location CRUD only.
+In production (S3 deploy), `VITE_NDBC_URL` points at `backend/main.py`'s `GET /api/ndbc/latest_obs.txt` — a server-side proxy, since NDBC sends no CORS header and the browser can't call it directly. The backend is deployed via `.github/workflows/deploy-backend.yml` (Fly.io); see `CONTEXT.md`'s "CI/CD" section for the one-time setup this still needs. The FastAPI backend also handles email capture and admin-gated private spots — its *legacy* location-CRUD endpoints are the only unused part.
 
 ---
 
