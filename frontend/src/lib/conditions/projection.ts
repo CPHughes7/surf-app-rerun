@@ -1,4 +1,5 @@
 import { computeSurfability } from '../surfability'
+import { estimateFacingDeg } from '../geo/coastline'
 import type { SpotConditions, SurfabilityFlag, SurfabilityScore } from '../../types/conditions'
 
 export type WindExposure = 'onshore' | 'offshore' | 'crossshore' | 'unknown'
@@ -8,6 +9,11 @@ export type PrivateSpotVerdict = SurfabilityScore & {
   windExposure: WindExposure
   /** 0-100. How much the source stations' distance has eaten into trust in this read — see decayFactor. */
   confidencePercent: number
+}
+
+/** Same shape as a catalog spot's normal score, plus which way the wind's blowing relative to shore. */
+export type ShorelineAwareVerdict = SurfabilityScore & {
+  windExposure: WindExposure
 }
 
 function angularDiff(a: number, b: number): number {
@@ -37,6 +43,50 @@ const ONSHORE_DOWNGRADE: Partial<Record<SurfabilityFlag, SurfabilityFlag>> = {
   good: 'marginal',
   marginal: 'tooWindy',
   windOnly: 'marginal',
+}
+
+/**
+ * Applies the onshore/offshore wind-exposure adjustment to an already-
+ * computed score, without touching confidence or adding any "projected"
+ * framing — shared by catalog spots (real confidence, real breaks) and
+ * private spots (which wrap this with their own confidence-decay math
+ * below). `computeSurfability` itself is never modified by this.
+ */
+export function applyWindExposure(base: SurfabilityScore, windExposure: WindExposure): ShorelineAwareVerdict {
+  const downgradeTo = windExposure === 'onshore' ? ONSHORE_DOWNGRADE[base.overall] : undefined
+  const overall = downgradeTo ?? base.overall
+
+  const exposureNote =
+    windExposure === 'onshore'
+      ? " Wind looks onshore for this spot's facing — expect it choppier than the raw numbers suggest."
+      : windExposure === 'offshore'
+        ? " Wind looks offshore for this spot's facing — favorable if the rest lines up."
+        : ''
+
+  return {
+    overall,
+    flags: downgradeTo ? [...new Set([...base.flags, overall])] : base.flags,
+    summary: `${base.summary}${exposureNote}`,
+    confidence: base.confidence,
+    windExposure,
+  }
+}
+
+/**
+ * The free-tier enhancement: a catalog spot's facing direction (read from
+ * the same shoreline outline the private-spot coastline gate uses — see
+ * lib/geo/coastline.ts) applied to its wind reading. Real confidence,
+ * real known break — this is not a projection, just a better-informed
+ * verdict for the exact same data catalog spots already had.
+ */
+export function computeShorelineAwareSurfability(
+  spot: { lat: number; lng: number },
+  conditions: SpotConditions | null,
+): ShorelineAwareVerdict {
+  const base = computeSurfability(conditions)
+  const facingDeg = estimateFacingDeg(spot.lat, spot.lng)
+  const windExposure = classifyWindExposure(facingDeg, conditions?.wind?.dirDeg ?? null)
+  return applyWindExposure(base, windExposure)
 }
 
 // Exponential decay, not a cliff: confidence halves every N km. Waves carry
@@ -76,9 +126,10 @@ function computeConfidencePercent(conditions: SpotConditions | null): number {
 /**
  * Produces a verdict for a spot with no buoy of its own, by fusing the
  * same nearest-in-range NOAA data catalog spots use (via the Step 4 seam)
- * with a simple onshore/offshore adjustment for the spot's facing. Always
- * reports 'low' confidence — a projection to a point is never as
- * trustworthy as a known break with real history — and says so plainly.
+ * with the same onshore/offshore exposure adjustment catalog spots get
+ * (applyWindExposure above) — but always reports decayed confidence,
+ * because a projection to a point is never as trustworthy as a known
+ * break with real history, and says so plainly.
  */
 export function projectPrivateSpotVerdict(
   conditions: SpotConditions | null,
@@ -87,16 +138,7 @@ export function projectPrivateSpotVerdict(
   const base = computeSurfability(conditions)
   const windExposure = classifyWindExposure(facingDeg, conditions?.wind?.dirDeg ?? null)
   const confidencePercent = computeConfidencePercent(conditions)
-
-  const downgradeTo = windExposure === 'onshore' ? ONSHORE_DOWNGRADE[base.overall] : undefined
-  const overall = downgradeTo ?? base.overall
-
-  const exposureNote =
-    windExposure === 'onshore'
-      ? " Wind looks onshore for this spot's facing — expect it choppier than the raw numbers suggest."
-      : windExposure === 'offshore'
-        ? " Wind looks offshore for this spot's facing — favorable if the rest lines up."
-        : ''
+  const adjusted = applyWindExposure(base, windExposure)
 
   const waveDistanceKm = conditions?.wave?.distanceKm
   const decayNote =
@@ -109,12 +151,10 @@ export function projectPrivateSpotVerdict(
       : ''
 
   return {
-    overall,
-    flags: downgradeTo ? [...new Set([...base.flags, overall])] : base.flags,
-    summary: `Projected verdict — no buoy at this exact spot, fused from nearby stations.${decayNote}${exposureNote} ${base.summary}`,
+    ...adjusted,
+    summary: `Projected verdict — no buoy at this exact spot, fused from nearby stations.${decayNote} ${adjusted.summary}`,
     confidence: 'low',
     isProjected: true,
-    windExposure,
     confidencePercent,
   }
 }

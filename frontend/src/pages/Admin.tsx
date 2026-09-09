@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { SurfSpot } from '../data/surfSpots'
-import { bearingDeg, compassLabel } from '../lib/geo/bearing'
-import { DEFAULT_MAX_COASTLINE_DISTANCE_KM, distanceToCoastlineKm } from '../lib/geo/coastline'
+import { bearingDeg, compassLabel, destinationPoint } from '../lib/geo/bearing'
+import { DEFAULT_MAX_COASTLINE_DISTANCE_KM, distanceToCoastlineKm, estimateFacingDeg } from '../lib/geo/coastline'
 import { resolveAllConditions } from '../lib/conditions/resolveConditions'
 import { projectPrivateSpotVerdict, type PrivateSpotVerdict } from '../lib/conditions/projection'
 import { verdictCopyFor } from '../lib/verdictCopy'
@@ -256,6 +256,7 @@ function CreateSpotForm({
   const [name, setName] = useState('')
   const [draftLocation, setDraftLocation] = useState<LatLng | null>(null)
   const [draftFacingPoint, setDraftFacingPoint] = useState<LatLng | null>(null)
+  const [facingIsAuto, setFacingIsAuto] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -264,7 +265,7 @@ function CreateSpotForm({
       ? bearingDeg(draftLocation.lat, draftLocation.lng, draftFacingPoint.lat, draftFacingPoint.lng)
       : null
 
-  const step = !draftLocation ? 'location' : !draftFacingPoint ? 'facing' : 'ready'
+  const step = !draftLocation ? 'location' : 'ready'
 
   const handleMapClick = (lat: number, lng: number) => {
     setFormError(null)
@@ -272,23 +273,31 @@ function CreateSpotForm({
       const distanceKm = distanceToCoastlineKm(lat, lng)
       if (distanceKm > DEFAULT_MAX_COASTLINE_DISTANCE_KM) {
         setFormError(
-          `That's ${distanceKm.toFixed(0)} km from the Lake Michigan shoreline — private spots have to be within ${DEFAULT_MAX_COASTLINE_DISTANCE_KM} km of the coast. Click closer to shore.`,
+          `That's ${distanceKm.toFixed(1)} km from the Lake Michigan shoreline — private spots have to be within ${DEFAULT_MAX_COASTLINE_DISTANCE_KM} km of the coast. Click closer to shore.`,
         )
         return
       }
+      // Auto-generate a facing default from the local shoreline direction —
+      // reads the same outline the coastline gate uses, rotated to point out
+      // toward open water. A synthetic point 5km out in that direction keeps
+      // the map's line/marker visualization and the bearing math unchanged;
+      // clicking again below overrides it with a real manual facing point.
+      const autoFacingDeg = estimateFacingDeg(lat, lng)
       setDraftLocation({ lat, lng })
-    } else if (step === 'facing') {
-      setDraftFacingPoint({ lat, lng })
+      setDraftFacingPoint(destinationPoint(lat, lng, autoFacingDeg, 5))
+      setFacingIsAuto(true)
     } else {
-      // Both already set — clicking again starts a new spot from scratch.
-      setDraftLocation({ lat, lng })
-      setDraftFacingPoint(null)
+      // Ready — a click here overrides the facing (auto or previously
+      // manual) rather than starting a new spot. Reset pin starts over.
+      setDraftFacingPoint({ lat, lng })
+      setFacingIsAuto(false)
     }
   }
 
   const handleReset = () => {
     setDraftLocation(null)
     setDraftFacingPoint(null)
+    setFacingIsAuto(false)
   }
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -318,10 +327,11 @@ function CreateSpotForm({
       <p className={formError ? 'admin-create-form__hint admin-create-form__hint--error' : 'admin-create-form__hint'}>
         {formError && formError}
         {!formError && step === 'location' && 'Click the map where the break is.'}
-        {!formError && step === 'facing' &&
-          'Now click the direction it faces — straight out toward open water.'}
-        {!formError && step === 'ready' &&
-          `Facing ${compassLabel(facingDeg!)} (${facingDeg!.toFixed(0)}°). Click the map again to start over, or name it and create it.`}
+        {!formError &&
+          step === 'ready' &&
+          (facingIsAuto
+            ? `Facing ${compassLabel(facingDeg!)} (${facingDeg!.toFixed(0)}°) — auto-detected from the shoreline. Click the map to correct it, or name it and create it.`
+            : `Facing ${compassLabel(facingDeg!)} (${facingDeg!.toFixed(0)}°) — set manually. Click again to adjust, or name it and create it.`)}
       </p>
 
       <AdminSpotMap

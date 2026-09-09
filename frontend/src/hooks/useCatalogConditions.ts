@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { SURF_SPOTS } from '../data/surfSpots'
 import { resolveAllConditions } from '../lib/conditions/resolveConditions'
-import { computeSurfability } from '../lib/surfability'
+import { computeShorelineAwareSurfability } from '../lib/conditions/projection'
 import type { SpotConditions, SurfabilityScore } from '../types/conditions'
 import type { BuoyDataState } from './useBuoyData'
 import { EMPTY_SURFABILITY } from './useBuoyData'
@@ -33,7 +33,7 @@ export function useCatalogConditions(): CatalogConditionsState {
           const conditions = conditionsBySpotId.get(spot.id) ?? null
           next[spot.id] = {
             conditions,
-            surfability: computeSurfability(conditions),
+            surfability: computeShorelineAwareSurfability(spot, conditions),
           }
         }
         setBySpotId(next)

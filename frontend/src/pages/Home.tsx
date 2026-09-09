@@ -136,6 +136,7 @@ function Home() {
             <LakeMap
               pins={pins}
               selectedSpotId={selectedSpotId}
+              catalog={catalog}
               onMapClick={handleMapClick}
               onMarkerClick={handleMarkerClick}
             />

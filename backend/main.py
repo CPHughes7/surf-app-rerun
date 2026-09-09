@@ -182,7 +182,10 @@ class PrivateSpotInput(BaseModel):
     name: str
     lat: float
     lng: float
-    facingDeg: float
+    # Optional: the admin UI always computes and sends one (auto-detected
+    # from the shoreline, or manually overridden), but a direct API caller
+    # can omit it and get the same shoreline-based auto-detection here.
+    facingDeg: float | None = None
 
 
 @app.post("/api/private-spots")
@@ -209,12 +212,14 @@ def create_private_spot(payload: PrivateSpotInput, _: None = Depends(require_adm
         raise HTTPException(
             status_code=422,
             detail=(
-                f"That's {shore_distance_km:.0f} km from the Lake Michigan shoreline — "
+                f"That's {shore_distance_km:.1f} km from the Lake Michigan shoreline — "
                 f"private spots have to be within {coastline.DEFAULT_MAX_COASTLINE_DISTANCE_KM} km of the coast."
             ),
         )
 
-    facing_deg = payload.facingDeg % 360
+    facing_deg = payload.facingDeg % 360 if payload.facingDeg is not None else coastline.estimate_facing_deg(
+        payload.lat, payload.lng
+    )
 
     spot_id = uuid.uuid4().hex
     created_at = datetime.now(timezone.utc).isoformat()
