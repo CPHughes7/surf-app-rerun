@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import LakeMap from '../components/LakeMap'
 import LocationDetailPanel from '../components/LocationDetailPanel'
 import LocationsPanel from '../components/LocationsPanel'
@@ -17,9 +17,16 @@ function Home() {
   const [drawerOpen, setDrawerOpen] = useState(
     () => typeof window === 'undefined' || window.matchMedia('(min-width: 901px)').matches,
   )
-  const [popupDismissSignal, setPopupDismissSignal] = useState(0)
   const [mapMessage, setMapMessage] = useState<string | null>(null)
   const messageTimerRef = useRef<number | null>(null)
+
+  // Full-screen detail is a takeover — never let the page scroll behind it.
+  useEffect(() => {
+    document.body.style.overflow = detailPin ? 'hidden' : ''
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [detailPin])
 
   const showMapMessage = useCallback((message: string) => {
     setMapMessage(message)
@@ -27,16 +34,11 @@ function Home() {
     messageTimerRef.current = window.setTimeout(() => setMapMessage(null), 4000)
   }, [])
 
-  const selectSpot = useCallback((spotId: string) => {
-    const spot = getSpotById(spotId)
-    if (!spot) return
-    setSelectedSpotId(spot.id)
-  }, [])
-
+  // The only way a spot's detail ever opens — marker, drawer, or snap-click
+  // all funnel through here, so there is never more than one open at once.
   const openDetail = useCallback((pin: LocationPin) => {
     setSelectedSpotId(pin.spotId)
     setDetailPin(pin)
-    setPopupDismissSignal((signal) => signal + 1)
   }, [])
 
   const handleMapClick = useCallback(
@@ -67,9 +69,12 @@ function Home() {
     [openDetail],
   )
 
-  const handleMarkerClick = useCallback((pin: LocationPin) => {
-    selectSpot(pin.spotId)
-  }, [selectSpot])
+  const handleMarkerClick = useCallback(
+    (pin: LocationPin) => {
+      openDetail(pin)
+    },
+    [openDetail],
+  )
 
   const handleCloseDrawer = useCallback(() => setDrawerOpen(false), [])
 
@@ -80,13 +85,7 @@ function Home() {
           <button
             type="button"
             className="btn btn--ghost drawer-toggle"
-            onClick={() => {
-              setDrawerOpen((open) => {
-                const next = !open
-                if (next) setPopupDismissSignal((signal) => signal + 1)
-                return next
-              })
-            }}
+            onClick={() => setDrawerOpen((open) => !open)}
             aria-expanded={drawerOpen}
             aria-controls="spots-drawer"
           >
@@ -95,7 +94,7 @@ function Home() {
         </div>
         <div className="app-header__center">
           <h1>Lake Surf</h1>
-          <p className="app-header__tagline">Live NOAA conditions for Lake Michigan breaks</p>
+          <p className="app-header__tagline">The verdict, before you drive.</p>
         </div>
         <div className="app-header__side app-header__side--right" aria-hidden="true" />
       </header>
@@ -137,23 +136,20 @@ function Home() {
             <LakeMap
               pins={pins}
               selectedSpotId={selectedSpotId}
-              popupDismissSignal={popupDismissSignal}
-              catalog={catalog}
               onMapClick={handleMapClick}
               onMarkerClick={handleMarkerClick}
-              onOpenDetail={openDetail}
             />
           </div>
-
-          {detailPin && (
-            <LocationDetailPanel
-              pin={detailPin}
-              buoyData={buoyDataForSpot(catalog, detailPin.spotId)}
-              onClose={() => setDetailPin(null)}
-            />
-          )}
         </section>
       </div>
+
+      {detailPin && (
+        <LocationDetailPanel
+          pin={detailPin}
+          buoyData={buoyDataForSpot(catalog, detailPin.spotId)}
+          onClose={() => setDetailPin(null)}
+        />
+      )}
     </div>
   )
 }

@@ -1,10 +1,7 @@
-import { useEffect, useMemo } from 'react'
-import { MapContainer, Marker, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet'
+import { useMemo } from 'react'
+import { MapContainer, Marker, TileLayer, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
-import type { CatalogConditionsState } from '../hooks/useCatalogConditions'
-import { buoyDataForSpot } from '../hooks/useCatalogConditions'
 import type { LocationPin } from '../types/location'
-import PinPopupContent from './PinPopupContent'
 
 const LAKE_MICHIGAN_CENTER: [number, number] = [44.0, -86.5]
 const LAKE_MICHIGAN_ZOOM = 6
@@ -38,35 +35,16 @@ function MapClickHandler({ onMapClick }: MapClickHandlerProps) {
   return null
 }
 
-function ClosePopupsOnSignal({ signal }: { signal: number }) {
-  const map = useMap()
-
-  useEffect(() => {
-    if (signal > 0) map.closePopup()
-  }, [signal, map])
-
-  return null
-}
-
 type LakeMapProps = {
   pins: LocationPin[]
   selectedSpotId: string | null
-  popupDismissSignal: number
-  catalog: CatalogConditionsState
   onMapClick: (lat: number, lng: number) => void
   onMarkerClick: (pin: LocationPin) => void
-  onOpenDetail: (pin: LocationPin) => void
 }
 
-function LakeMap({
-  pins,
-  selectedSpotId,
-  popupDismissSignal,
-  catalog,
-  onMapClick,
-  onMarkerClick,
-  onOpenDetail,
-}: LakeMapProps) {
+function LakeMap({ pins, selectedSpotId, onMapClick, onMarkerClick }: LakeMapProps) {
+  // Marker click goes straight to the full-screen detail view — no
+  // intermediate popup. Only one thing is ever "open" at a time.
   const markers = useMemo(
     () =>
       pins.map((pin) => {
@@ -82,25 +60,10 @@ function LakeMap({
                 onMarkerClick(pin)
               },
             }}
-          >
-            <Popup
-              minWidth={260}
-              maxWidth={320}
-              maxHeight={360}
-              className="pin-popup-wrapper"
-              autoPan
-              autoPanPadding={[16, 16]}
-            >
-              <PinPopupContent
-                pin={pin}
-                buoyData={buoyDataForSpot(catalog, pin.spotId)}
-                onOpen={() => onOpenDetail(pin)}
-              />
-            </Popup>
-          </Marker>
+          />
         )
       }),
-    [pins, selectedSpotId, catalog, onMarkerClick, onOpenDetail],
+    [pins, selectedSpotId, onMarkerClick],
   )
 
   return (
@@ -115,7 +78,6 @@ function LakeMap({
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <MapClickHandler onMapClick={onMapClick} />
-      <ClosePopupsOnSignal signal={popupDismissSignal} />
       {markers}
     </MapContainer>
   )
