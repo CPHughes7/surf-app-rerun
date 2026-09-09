@@ -156,17 +156,19 @@ Deliberately **one environment** (production, deployed from `main`), not the dev
 
 **Backend (Fly.io):** `main` push (when `backend/**` changes) → [`.github/workflows/deploy-backend.yml`](.github/workflows/deploy-backend.yml) → `flyctl deploy --remote-only` using [`backend/fly.toml`](backend/fly.toml) (Fly builds the [`Dockerfile`](backend/Dockerfile) remotely — no Docker needed locally or in CI). Persistent volume mounted at `/data` (`APP_DB_PATH=/data/app.db`) so SQLite survives restarts/redeploys. Scales to zero when idle (`min_machines_running = 0`) to minimize cost — first request after idle has a cold-start delay; bump to `1` in `fly.toml` if that becomes annoying. `FLY_API_TOKEN` is a different provider from the frontend's AWS keys, not a broader AWS grant.
 
-**One-time manual setup (not automatable — needs your own account/CLI):**
+**Status: live and verified (2026-09-09).** App is `lake-surf-api.fly.dev`, secrets (`ADMIN_SECRET`, `ALLOWED_ORIGINS`) are set, and the full loop was checked end-to-end against the deployed S3 site: live NOAA data renders on a catalog spot, `/api/notify-me` persists a submission, CORS is scoped correctly to the S3 origin. `main` still has the pre-fix Dockerfile (`COPY main.py db.py ./`, missing `coastline.py` → crashes on boot) — the live app was deployed manually from `dev/rebuild`'s fix (commit `7870986`); that commit needs to reach `main` before the automated pipeline is trustworthy again.
 
-1. Create a Fly.io account, then locally: `fly auth login`.
-2. `fly apps create lake-surf-api` — **app names are globally unique across all Fly users**; if taken, pick an alternative and update it in `backend/fly.toml`'s `app =` line and in `.github/workflows/deploy.yml`'s two `VITE_*` values (hardcoded to `https://lake-surf-api.fly.dev`).
-3. `fly volumes create surf_data --app lake-surf-api --region ord --size 1`.
-4. `fly secrets set ADMIN_SECRET=<pick-something-real> --app lake-surf-api`. `ALLOWED_ORIGINS` too, once you know the production frontend URL (`fly secrets set ALLOWED_ORIGINS=https://<bucket>.s3-website-<region>.amazonaws.com --app lake-surf-api`).
-5. `fly tokens create` (or `fly auth token`) → add as GitHub repo secret `FLY_API_TOKEN`.
+**Hosting platform decision — provisional, not final.** Fly.io was picked to get a working backend behind the demand-validation push quickly (free-tier-friendly, scale-to-zero, one CLI, no separate container registry to manage). It has **not** been evaluated against alternatives (Render, Railway, a plain EC2/Lightsail box, AWS Lambda behind API Gateway, Cloud Run) on the things that would matter at real scale: sustained cost once traffic isn't idle-most-of-the-time, cold-start latency on the free tier (scale-to-zero — first hit after idle is slow), operational maturity for a real SQLite-on-a-volume setup vs. a managed DB, and how it fits if the stack ever needs more than one region. Treat this as the platform for the validation phase, not a locked-in long-term choice — revisit deliberately (cost + latency data in hand) before treating Fly.io as the answer rather than the placeholder.
 
-None of these steps involve pasting a secret to me or into this repo — GitHub secrets and Fly's own secret store are the only places they live. No new AWS credentials needed; the existing `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`/`AWS_REGION`/`S3_BUCKET` secrets are reused as-is.
+**How this Fly app was set up (reference, for a new app/environment — not a TODO, already done for `lake-surf-api`):**
 
-Not done: verifying the whole loop end-to-end once secrets are in place (push to `main`, check the Actions tab, hit the live URL).
+1. Fly.io account + `fly auth login` (interactive OAuth — needs a real terminal, not automatable).
+2. `fly apps create <name>` — app names are globally unique across all Fly users.
+3. `fly volumes create surf_data --app <name> --region ord --size 1`.
+4. `fly secrets set ADMIN_SECRET=<value> ALLOWED_ORIGINS=<frontend-origin> --app <name>`.
+5. `fly tokens create` → GitHub repo secret `FLY_API_TOKEN`.
+
+No secret values are ever pasted into this repo — GitHub secrets and Fly's own secret store are the only places they live.
 
 ---
 
