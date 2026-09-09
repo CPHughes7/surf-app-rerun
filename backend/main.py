@@ -9,6 +9,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+import coastline
 import db
 
 app = FastAPI()
@@ -76,25 +77,30 @@ class NotifyMeInput(BaseModel):
     utmMedium: str | None = None
     utmCampaign: str | None = None
     referrer: str | None = None
+    locationInterest: str | None = None
 
 
 @app.post("/api/notify-me")
 def notify_me(payload: NotifyMeInput):
     """Capture a "tell me when a session lines up" lead, optionally tied to a
-    spot. Also records first-touch channel attribution (utm_* / referrer) so
-    interest can be broken down by marketing channel later."""
+    spot. Also records first-touch channel attribution (utm_* / referrer) and,
+    for the advanced-analysis pitch, a free-text location/lake of interest —
+    where people want coverage tells us where to spend data/build effort
+    next, which is itself a resourcing question."""
     email = payload.email.strip().lower()
     if not email or not EMAIL_RE.match(email):
         raise HTTPException(status_code=422, detail="Enter a valid email address")
 
     spot_id = (payload.spotId or "").strip()
+    location_interest = (payload.locationInterest or "").strip() or None
     created_at = datetime.now(timezone.utc).isoformat()
 
     with db.get_connection() as conn:
         conn.execute(
             """
-            INSERT INTO subscribers (email, spot_id, utm_source, utm_medium, utm_campaign, referrer, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO subscribers
+                (email, spot_id, utm_source, utm_medium, utm_campaign, referrer, location_interest, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(email, spot_id) DO NOTHING
             """,
             (
@@ -104,6 +110,7 @@ def notify_me(payload: NotifyMeInput):
                 payload.utmMedium,
                 payload.utmCampaign,
                 payload.referrer,
+                location_interest,
                 created_at,
             ),
         )
@@ -132,10 +139,19 @@ def notify_me_stats(_: None = Depends(require_admin_secret)):
         ).fetchall()
         recent = conn.execute(
             """
-            SELECT email, spot_id, utm_source, utm_medium, utm_campaign, referrer, created_at
+            SELECT email, spot_id, utm_source, utm_medium, utm_campaign, referrer, location_interest, created_at
             FROM subscribers
             ORDER BY created_at DESC
             LIMIT 25
+            """
+        ).fetchall()
+        location_interests = conn.execute(
+            """
+            SELECT location_interest, COUNT(*) AS count
+            FROM subscribers
+            WHERE location_interest IS NOT NULL AND location_interest != ''
+            GROUP BY location_interest
+            ORDER BY count DESC
             """
         ).fetchall()
 
@@ -143,6 +159,9 @@ def notify_me_stats(_: None = Depends(require_admin_secret)):
         "total": total,
         "advancedInterest": advanced_interest,
         "bySource": [{"source": row["source"], "count": row["count"]} for row in by_source],
+        "locationInterests": [
+            {"location": row["location_interest"], "count": row["count"]} for row in location_interests
+        ],
         "recent": [
             {
                 "email": row["email"],
@@ -151,6 +170,7 @@ def notify_me_stats(_: None = Depends(require_admin_secret)):
                 "utmMedium": row["utm_medium"],
                 "utmCampaign": row["utm_campaign"],
                 "referrer": row["referrer"],
+                "locationInterest": row["location_interest"],
                 "createdAt": row["created_at"],
             }
             for row in recent
@@ -181,6 +201,19 @@ def create_private_spot(payload: PrivateSpotInput, _: None = Depends(require_adm
         raise HTTPException(status_code=422, detail="Name is required")
     if not (-90 <= payload.lat <= 90) or not (-180 <= payload.lng <= 180):
         raise HTTPException(status_code=422, detail="Invalid coordinates")
+
+    # Real enforcement — the client-side check in Admin.tsx is only there to
+    # reject bad clicks early; this is what actually stops it.
+    shore_distance_km = coastline.distance_to_coastline_km(payload.lat, payload.lng)
+    if shore_distance_km > coastline.DEFAULT_MAX_COASTLINE_DISTANCE_KM:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"That's {shore_distance_km:.0f} km from the Lake Michigan shoreline — "
+                f"private spots have to be within {coastline.DEFAULT_MAX_COASTLINE_DISTANCE_KM} km of the coast."
+            ),
+        )
+
     facing_deg = payload.facingDeg % 360
 
     spot_id = uuid.uuid4().hex

@@ -2,7 +2,7 @@ import { getAttribution } from './attribution'
 
 const API_BASE_URL = import.meta.env?.VITE_API_URL ?? ''
 
-export async function notifyMe(email: string, spotId?: string): Promise<void> {
+export async function notifyMe(email: string, spotId?: string, locationInterest?: string): Promise<void> {
   const attribution = getAttribution()
   const response = await fetch(`${API_BASE_URL}/api/notify-me`, {
     method: 'POST',
@@ -14,6 +14,7 @@ export async function notifyMe(email: string, spotId?: string): Promise<void> {
       utmMedium: attribution.utmMedium,
       utmCampaign: attribution.utmCampaign,
       referrer: attribution.referrer,
+      locationInterest: locationInterest?.trim() || null,
     }),
   })
 

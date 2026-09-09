@@ -54,6 +54,7 @@ export type NotifyMeStats = {
   total: number
   advancedInterest: number
   bySource: { source: string; count: number }[]
+  locationInterests: { location: string; count: number }[]
   recent: {
     email: string
     spotId: string | null
@@ -61,6 +62,7 @@ export type NotifyMeStats = {
     utmMedium: string | null
     utmCampaign: string | null
     referrer: string | null
+    locationInterest: string | null
     createdAt: string
   }[]
 }

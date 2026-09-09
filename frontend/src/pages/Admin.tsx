@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { SurfSpot } from '../data/surfSpots'
 import { bearingDeg, compassLabel } from '../lib/geo/bearing'
+import { DEFAULT_MAX_COASTLINE_DISTANCE_KM, distanceToCoastlineKm } from '../lib/geo/coastline'
 import { resolveAllConditions } from '../lib/conditions/resolveConditions'
 import { projectPrivateSpotVerdict, type PrivateSpotVerdict } from '../lib/conditions/projection'
 import { verdictCopyFor } from '../lib/verdictCopy'
-import { qualityLabel } from '../lib/surfability'
 import {
   createPrivateSpot,
   getNotifyStats,
@@ -168,7 +168,7 @@ function AdminPage() {
               </p>
               <div className={`verdict-banner verdict-banner--${copy.tone}`}>
                 <p className="verdict-banner__eyebrow">
-                  Projected verdict · {qualityLabel(verdict.confidence)}
+                  Projected verdict · {verdict.confidencePercent}% confidence
                 </p>
                 <h4 className="verdict-banner__headline">{copy.headline}</h4>
                 <p className="verdict-banner__summary">{verdict.summary}</p>
@@ -195,6 +195,22 @@ function InterestStats({ stats }: { stats: NotifyMeStats | null }) {
         </p>
       </div>
 
+      {stats.locationInterests.length > 0 && (
+        <div className="admin-stats__sources">
+          <p className="admin-page__section-title admin-page__section-title--small">
+            Where people want coverage
+          </p>
+          <ul className="admin-stats__source-list">
+            {stats.locationInterests.map((row) => (
+              <li key={row.location} className="admin-stats__source-row">
+                <span>{row.location}</span>
+                <span className="admin-stats__source-count">{row.count}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {(stats.bySource.length > 0 || stats.recent.length > 0) && (
         <details className="admin-stats__recent">
           <summary>Detail — by channel, most recent</summary>
@@ -213,6 +229,7 @@ function InterestStats({ stats }: { stats: NotifyMeStats | null }) {
               <li key={`${row.email}-${row.createdAt}`}>
                 {row.email}
                 {row.spotId ? ` · ${row.spotId}` : ''}
+                {row.locationInterest ? ` · wants: ${row.locationInterest}` : ''}
                 {row.utmSource ? ` · ${row.utmSource}` : row.referrer ? ` · via ${row.referrer}` : ''}
                 {' · '}
                 {new Date(row.createdAt).toLocaleString()}
@@ -252,6 +269,13 @@ function CreateSpotForm({
   const handleMapClick = (lat: number, lng: number) => {
     setFormError(null)
     if (step === 'location') {
+      const distanceKm = distanceToCoastlineKm(lat, lng)
+      if (distanceKm > DEFAULT_MAX_COASTLINE_DISTANCE_KM) {
+        setFormError(
+          `That's ${distanceKm.toFixed(0)} km from the Lake Michigan shoreline — private spots have to be within ${DEFAULT_MAX_COASTLINE_DISTANCE_KM} km of the coast. Click closer to shore.`,
+        )
+        return
+      }
       setDraftLocation({ lat, lng })
     } else if (step === 'facing') {
       setDraftFacingPoint({ lat, lng })
@@ -291,11 +315,12 @@ function CreateSpotForm({
 
   return (
     <form className="admin-create-form" onSubmit={handleSubmit}>
-      <p className="admin-create-form__hint">
-        {step === 'location' && 'Click the map where the break is.'}
-        {step === 'facing' &&
+      <p className={formError ? 'admin-create-form__hint admin-create-form__hint--error' : 'admin-create-form__hint'}>
+        {formError && formError}
+        {!formError && step === 'location' && 'Click the map where the break is.'}
+        {!formError && step === 'facing' &&
           'Now click the direction it faces — straight out toward open water.'}
-        {step === 'ready' &&
+        {!formError && step === 'ready' &&
           `Facing ${compassLabel(facingDeg!)} (${facingDeg!.toFixed(0)}°). Click the map again to start over, or name it and create it.`}
       </p>
 
@@ -332,11 +357,6 @@ function CreateSpotForm({
       >
         {submitting ? 'Creating…' : 'Create private spot'}
       </button>
-      {formError && (
-        <p className="email-capture__error" role="alert">
-          {formError}
-        </p>
-      )}
     </form>
   )
 }

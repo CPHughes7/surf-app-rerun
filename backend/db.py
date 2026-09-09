@@ -23,6 +23,7 @@ def init_db() -> None:
                 utm_medium TEXT,
                 utm_campaign TEXT,
                 referrer TEXT,
+                location_interest TEXT,
                 created_at TEXT NOT NULL,
                 UNIQUE(email, spot_id)
             )

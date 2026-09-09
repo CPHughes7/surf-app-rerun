@@ -7,6 +7,7 @@ type Status = 'idle' | 'submitting' | 'success' | 'error'
 
 function AdvancedAnalysisPitch() {
   const [email, setEmail] = useState('')
+  const [locationInterest, setLocationInterest] = useState('')
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -17,7 +18,7 @@ function AdvancedAnalysisPitch() {
     setStatus('submitting')
     setError(null)
     try {
-      await notifyMe(email, ADVANCED_INTEREST_SPOT_ID)
+      await notifyMe(email, ADVANCED_INTEREST_SPOT_ID, locationInterest)
       setStatus('success')
     } catch (err) {
       setStatus('error')
@@ -42,18 +43,29 @@ function AdvancedAnalysisPitch() {
       </p>
       <form className="advanced-pitch__form" onSubmit={handleSubmit}>
         <input
-          type="email"
-          required
-          placeholder="you@example.com"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          className="email-capture__input"
+          type="text"
+          placeholder="Where? A spot, a stretch of coast, another lake entirely (optional)"
+          value={locationInterest}
+          onChange={(event) => setLocationInterest(event.target.value)}
+          className="email-capture__input advanced-pitch__where"
           disabled={status === 'submitting'}
-          aria-label="Email for advanced analysis early access"
+          aria-label="Where are you hoping to get coverage (optional)"
         />
-        <button type="submit" className="btn btn--primary" disabled={status === 'submitting'}>
-          {status === 'submitting' ? 'Saving…' : 'Get early access'}
-        </button>
+        <div className="advanced-pitch__row">
+          <input
+            type="email"
+            required
+            placeholder="you@example.com"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            className="email-capture__input"
+            disabled={status === 'submitting'}
+            aria-label="Email for advanced analysis early access"
+          />
+          <button type="submit" className="btn btn--primary" disabled={status === 'submitting'}>
+            {status === 'submitting' ? 'Saving…' : 'Get early access'}
+          </button>
+        </div>
       </form>
       {error && (
         <p className="email-capture__error" role="alert">

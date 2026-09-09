@@ -891,11 +891,25 @@
 
 .advanced-pitch__form {
   display: flex;
+  flex-direction: column;
   gap: 8px;
+}
+
+.advanced-pitch__row {
+  display: flex;
+  gap: 8px;
+}
+
+.advanced-pitch__where {
+  font-size: 13px;
 }
 
 .advanced-pitch .email-capture__input {
   border-color: transparent;
+}
+
+.advanced-pitch .email-capture__input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .advanced-pitch .btn--primary {
@@ -1351,6 +1365,11 @@
   font-size: 13px;
   color: var(--text-muted);
   min-height: 18px;
+}
+
+.admin-create-form__hint--error {
+  color: #b91c1c;
+  font-weight: 600;
 }
 
 .admin-map {
